@@ -10,11 +10,11 @@ packages:
           - name: close-debate-schedule
             sourceType: scheduler
             sourceDetails:
-              cron: "59 23 * * *"
+              cron: "59 13 * * *"
       - name: new-debate
         runtime: nodejs:18
         triggers:
           - name: new-debate-schedule
             sourceType: scheduler
             sourceDetails:
-              cron: "1 0 * * *"
+              cron: "1 14 * * *"
