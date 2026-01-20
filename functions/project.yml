@@ -8,11 +8,13 @@ packages:
         runtime: nodejs:18
         triggers:
           - name: close-debate-schedule
-            type: SCHEDULED
-            cron: "59 23 * * *"  # 11:59 PM UTC daily
+            sourceType: scheduler
+            sourceDetails:
+              cron: "59 23 * * *"
       - name: new-debate
         runtime: nodejs:18
         triggers:
           - name: new-debate-schedule
-            type: SCHEDULED
-            cron: "1 0 * * *"    # 12:01 AM UTC daily
+            sourceType: scheduler
+            sourceDetails:
+              cron: "1 0 * * *"
