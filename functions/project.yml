@@ -1,0 +1,18 @@
+packages:
+  - name: cron
+    environment:
+      APP_URL: "https://silly-debates-6vhp9.ondigitalocean.app"
+      CRON_SECRET: "${CRON_SECRET}"
+    functions:
+      - name: close-debate
+        runtime: nodejs:18
+        triggers:
+          - name: close-debate-schedule
+            type: SCHEDULED
+            cron: "59 23 * * *"  # 11:59 PM UTC daily
+      - name: new-debate
+        runtime: nodejs:18
+        triggers:
+          - name: new-debate-schedule
+            type: SCHEDULED
+            cron: "1 0 * * *"    # 12:01 AM UTC daily
