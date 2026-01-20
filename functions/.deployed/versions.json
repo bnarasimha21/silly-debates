@@ -1,0 +1,22 @@
+[
+  {
+    "apihost": "https://faas-nyc1-2ef2e6cc.doserverless.co",
+    "namespace": "fn-f56b35ca-bfe6-40ca-8664-b55906ea4bbc",
+    "packageVersions": {
+      "cron": {
+        "version": "0.0.1",
+        "digest": "7b8d17fe814491fc55ea532d805e5c68e0a1b0eb64a2e8b26af11aa6072c87f4"
+      }
+    },
+    "actionVersions": {
+      "cron/close-debate": {
+        "version": "0.0.1",
+        "digest": "7f8cfc0069f615a0893c7708564d5bbee33ced3148f9c30d57b96737697bf6e7"
+      },
+      "cron/new-debate": {
+        "version": "0.0.1",
+        "digest": "34ade7ffdb77a0327363e7fb9d7c60f8bb7a3862bfa83214406846f5b42cec56"
+      }
+    }
+  }
+]

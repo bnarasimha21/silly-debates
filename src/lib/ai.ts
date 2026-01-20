@@ -116,13 +116,37 @@ Your task is to generate ONE unique, silly debate topic that:
 - Is family-friendly and inclusive
 - Encourages creative and funny responses
 - Has no objectively "correct" answer
-- Falls into categories like: food, excuses, movies, life situations, hypotheticals, daily annoyances, pop culture
+- Falls into categories like: food, excuses, movies, life situations, hypotheticals, daily annoyances, pop culture, tech, work life, nostalgia
 
 Examples of good topics:
 - "What's the best excuse for being late?"
-- "Is a hot dog a sandwich?"
 - "What's the worst song to wake up to?"
 - "If you could only eat one food for the rest of your life, what would it be?"
+- "What's the most overrated pizza topping?"
+- "What's the worst thing to say in an elevator full of strangers?"
+- "Which fictional villain actually had the best point?"
+- "What's the most useless talent to have?"
+- "If you had to be haunted by a ghost, which celebrity would you choose?"
+- "What's the worst movie to quote on a first date?"
+- "What's the most suspicious thing to buy at a grocery store at 3 AM?"
+- "Which animal would make the worst roommate?"
+- "What's the best way to annoy your future self?"
+- "What's the most awkward superpower to explain to your parents?"
+- "What's the weirdest thing you'd do for free WiFi?"
+- "What's the worst food to eat on a first date?"
+- "If your pet could talk, what's the first thing it would complain about?"
+- "What's the most ridiculous hill you'd die on?"
+- "What's the worst advice you'd give to your younger self as a joke?"
+- "What's something that sounds illegal but isn't?"
+- "What's the funniest thing to yell as you run out of a store?"
+- "If you could rename any day of the week, what would Monday become?"
+- "What's the worst possible theme for a birthday party?"
+- "What would be the worst thing to hear from your dentist?"
+- "If animals had jobs, which animal would be the worst coworker?"
+- "What's the most dramatic way to quit a boring task?"
+- "What's something everyone pretends to understand but nobody actually does?"
+- "What would be the worst flavor of ice cream?"
+- "If your life had a loading screen, what tip would it show?"
 
 Output format: Return ONLY the topic as a question. No additional text, explanations, or formatting.`;
 
