@@ -1,0 +1,83 @@
+name: silly-debates
+region: nyc
+
+services:
+  - name: web
+    github:
+      repo: bnarasimha21/silly-debates
+      branch: main
+      deploy_on_push: true
+    build_command: npm run build
+    run_command: npm start
+    environment_slug: node-js
+    instance_count: 1
+    instance_size_slug: apps-s-1vcpu-0.5gb
+    http_port: 3000
+    routes:
+      - path: /
+    envs:
+      # Database - will be auto-populated if you attach a managed DB
+      - key: DATABASE_URL
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+
+      # NextAuth.js
+      - key: NEXTAUTH_URL
+        scope: RUN_TIME
+        value: ${APP_URL}
+      - key: NEXTAUTH_SECRET
+        scope: RUN_AND_BUILD_TIME
+        type: SECRET
+
+      # OAuth Providers
+      - key: GOOGLE_CLIENT_ID
+        scope: RUN_TIME
+        type: SECRET
+      - key: GOOGLE_CLIENT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: GITHUB_CLIENT_ID
+        scope: RUN_TIME
+        type: SECRET
+      - key: GITHUB_CLIENT_SECRET
+        scope: RUN_TIME
+        type: SECRET
+
+      # DigitalOcean Gradient AI
+      - key: GRADIENT_API_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: GRADIENT_INFERENCE_URL
+        scope: RUN_TIME
+        value: "https://inference.do-ai.run/v1/chat/completions"
+      - key: GRADIENT_INFERENCE_MODEL
+        scope: RUN_TIME
+        value: "llama3.3-70b-instruct"
+
+      # Gradient Knowledge Base
+      - key: GRADIENT_KB_UUID
+        scope: RUN_TIME
+        type: SECRET
+      - key: DO_API_TOKEN
+        scope: RUN_TIME
+        type: SECRET
+
+      # DigitalOcean Spaces
+      - key: SPACES_KEY
+        scope: RUN_TIME
+        type: SECRET
+      - key: SPACES_SECRET
+        scope: RUN_TIME
+        type: SECRET
+      - key: SPACES_BUCKET
+        scope: RUN_TIME
+        value: "silly-debates"
+      - key: SPACES_REGION
+        scope: RUN_TIME
+        value: "nyc3"
+
+      # Cron Authentication
+      - key: CRON_SECRET
+        scope: RUN_TIME
+        type: SECRET
+
