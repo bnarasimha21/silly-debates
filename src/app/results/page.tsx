@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import Image from "next/image";
 
+// Force dynamic rendering to always fetch fresh data
+export const dynamic = "force-dynamic";
+
 /**
  * Fetch the most recently closed debate with winner information
  */

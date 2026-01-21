@@ -1,6 +1,9 @@
 import { prisma } from "@/lib/prisma";
 import Image from "next/image";
 
+// Force dynamic rendering to always fetch fresh data
+export const dynamic = "force-dynamic";
+
 interface LeaderboardUser {
   id: string;
   name: string;
