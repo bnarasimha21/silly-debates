@@ -4,7 +4,7 @@
 A month-long daily debate game where users submit entries, vote, and interact with an AI chatbot to explore past debates.
 
 **Duration:** 30 days
-**Platform:** Web app (DigitalOcean App Platform + Gradient AI)
+**Platform:** Web app (DigitalOcean App Platform + Serverless Inference + Gradient KB)
 
 ---
 
@@ -16,7 +16,7 @@ A month-long daily debate game where users submit entries, vote, and interact wi
 │                   Next.js on App Platform                      │
 │  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌───────────────┐  │
 │  │  Home/   │  │  Submit  │  │ Results/ │  │   Chatbot     │  │
-│  │  Vote    │  │  Entry   │  │ History  │  │   (Past Data) │  │
+│  │  Vote    │  │  Entry   │  │ History  │  │   (Ask AI)    │  │
 │  └──────────┘  └──────────┘  └──────────┘  └───────────────┘  │
 └───────────────────────┬────────────────────────────────────────┘
                         │
@@ -26,20 +26,29 @@ A month-long daily debate game where users submit entries, vote, and interact wi
 │                 Next.js API Routes                             │
 │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────┐ │
 │  │ /api/debates │  │ /api/votes   │  │ /api/entries         │ │
-│  │ /api/results │  │ /api/users   │  │ /api/chat            │ │
+│  │ /api/cron/*  │  │ /api/chat    │  │ /api/test-spaces     │ │
 │  └──────────────┘  └──────────────┘  └──────────────────────┘ │
 └──────────┬─────────────────┬───────────────────┬───────────────┘
            │                 │                   │
            ▼                 ▼                   ▼
 ┌─────────────────┐  ┌───────────────┐  ┌────────────────────────┐
-│   PostgreSQL    │  │   Gradient    │  │      Gradient          │
-│   (DO Managed)  │  │   Agents      │  │    Knowledge Base      │
+│   PostgreSQL    │  │  Serverless   │  │   DO Spaces +          │
+│   (DO Managed)  │  │  Inference    │  │   Gradient KB          │
 │                 │  │               │  │                        │
-│ - users         │  │ - Topic Gen   │  │ - Past debates         │
-│ - debates       │  │ - Moderator   │  │ - Winners              │
-│ - entries       │  │ - Commentary  │  │ - Statistics           │
-│ - votes         │  │ - Chatbot     │  │                        │
+│ - users         │  │ - Topic Gen   │  │ - debates/*.json       │
+│ - debates       │  │ - Moderator   │  │ - debates/*.txt        │
+│ - entries       │  │ - Commentary  │  │ - KB Retrieval API     │
+│ - votes         │  │ - Chat + RAG  │  │                        │
 └─────────────────┘  └───────────────┘  └────────────────────────┘
+                              │
+                              ▼
+                     ┌───────────────┐
+                     │ DO Functions  │
+                     │ (Cron Jobs)   │
+                     │               │
+                     │ - close-debate│
+                     │ - new-debate  │
+                     └───────────────┘
 ```
 
 ---
@@ -48,118 +57,117 @@ A month-long daily debate game where users submit entries, vote, and interact wi
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | Next.js 14 (App Router) |
+| Frontend | Next.js 14+ (App Router) |
 | Styling | Tailwind CSS |
 | Backend | Next.js API Routes |
 | Database | DigitalOcean Managed PostgreSQL |
 | ORM | Prisma |
-| Auth | NextAuth.js (Google/GitHub OAuth) |
-| AI | DigitalOcean Gradient AI Platform |
+| Auth | NextAuth.js v5 (Google/GitHub OAuth) |
+| AI | DigitalOcean Serverless Inference (Llama 3.3 70B) |
+| Knowledge Base | DigitalOcean Spaces + Gradient KB Retrieval API |
 | Hosting | DigitalOcean App Platform |
-| Cron Jobs | DigitalOcean Functions (or App Platform Workers) |
+| Cron Jobs | DigitalOcean Functions |
 
 ---
 
-## Gradient AI Agents
+## AI Integration (Serverless Inference)
 
-### 1. Topic Generator Agent
+Instead of Gradient AI Agents, we use **Serverless Inference** with prompt-based AI functions:
+
+### 1. Topic Generator
 **Purpose:** Generate daily debate topics
-**Trigger:** Daily cron job at midnight
-**Prompt Strategy:**
-```
-You are a creative debate topic generator for a fun, lighthearted game.
-Generate ONE unique, silly debate topic that:
-- Is family-friendly and inclusive
-- Encourages creative/funny responses
-- Has no objectively "correct" answer
-- Falls into categories like: food, excuses, movies, life situations, hypotheticals
+**Implementation:** `src/lib/ai.ts` - `generateDebateTopic()`
+**Trigger:** DO Function cron at 9:01 AM EST daily
 
-Previously used topics: {list from knowledge base}
-
-Output format: Just the topic as a question (e.g., "What's the best excuse for being late?")
-```
-
-### 2. Content Moderation Agent
+### 2. Content Moderator
 **Purpose:** Filter user-submitted entries
-**Trigger:** On every entry submission
-**Guardrails:**
-- No profanity/hate speech
-- No personal attacks
-- Must be relevant to the topic
-- No spam/repetitive content
-
+**Implementation:** `src/lib/ai.ts` - `moderateContent()`
+**Trigger:** On every entry submission via `/api/entries`
 **Response:** `{ "approved": true/false, "reason": "..." }`
 
-### 3. Winner Commentary Agent
+### 3. Winner Commentary
 **Purpose:** Generate fun announcements for daily winners
-**Trigger:** End of day when closing debate
-**Output:** Witty 2-3 sentence commentary about the winning entry
+**Implementation:** `src/lib/ai.ts` - `generateWinnerCommentary()`
+**Trigger:** DO Function cron at 8:59 AM EST daily (when closing debate)
 
-### 4. History Chatbot Agent
+### 4. RAG Chatbot
 **Purpose:** Answer user questions about past debates
-**Knowledge Base:** All past debates, entries, votes, winners
-**Example Queries:**
-- "What was the funniest debate?"
-- "Show me all food-related debates"
-- "Who has won the most debates?"
-- "What was the winning entry for best pizza topping?"
+**Implementation:**
+- `src/lib/ai.ts` - `chatWithKBContext()`
+- `src/lib/gradient-kb.ts` - KB retrieval
+**Data Source:** Gradient Knowledge Base (populated from Spaces)
+
+---
+
+## Knowledge Base Architecture
+
+### Data Flow
+1. **Debate closes** → `close-debate` cron runs
+2. **Upload to Spaces** → JSON + TXT files to `silly-debates` bucket
+3. **Gradient KB indexes** → KB reads from Spaces bucket
+4. **Chat queries KB** → `/api/chat` calls KB retrieval API
+5. **LLM generates response** → Serverless Inference with KB context
+
+### Files in Spaces
+```
+silly-debates/
+├── debates/
+│   ├── day-01.json    # Structured debate data
+│   ├── day-01.txt     # Human-readable for better RAG
+│   ├── day-02.json
+│   ├── day-02.txt
+│   └── summary.json   # Optional: all debates summary
+```
 
 ---
 
 ## Database Schema
 
 ```sql
--- Users table
+-- Users table (NextAuth compatible)
 CREATE TABLE users (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  email VARCHAR(255) UNIQUE NOT NULL,
+  id TEXT PRIMARY KEY,
   name VARCHAR(255),
-  avatar_url TEXT,
-  provider VARCHAR(50), -- google, github
+  email VARCHAR(255) UNIQUE,
+  email_verified TIMESTAMP,
+  image TEXT,
   wins_count INT DEFAULT 0,
-  created_at TIMESTAMP DEFAULT NOW()
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP
 );
 
 -- Debates table
 CREATE TABLE debates (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  id TEXT PRIMARY KEY,
   topic TEXT NOT NULL,
-  day_number INT NOT NULL, -- 1-30
-  status VARCHAR(20) DEFAULT 'active', -- active, closed
+  day_number INT UNIQUE NOT NULL,
+  status VARCHAR(20) DEFAULT 'ACTIVE', -- ACTIVE, CLOSED
   created_at TIMESTAMP DEFAULT NOW(),
   closed_at TIMESTAMP,
-  winning_entry_id UUID,
+  winning_entry_id TEXT UNIQUE,
   winner_commentary TEXT
 );
 
--- Entries table (user submissions)
+-- Entries table
 CREATE TABLE entries (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  debate_id UUID REFERENCES debates(id),
-  user_id UUID REFERENCES users(id),
+  id TEXT PRIMARY KEY,
+  debate_id TEXT REFERENCES debates(id),
+  user_id TEXT REFERENCES users(id),
   content TEXT NOT NULL,
   vote_count INT DEFAULT 0,
-  is_winner BOOLEAN DEFAULT false,
   approved BOOLEAN DEFAULT true,
   created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(debate_id, user_id) -- one entry per user per debate
+  updated_at TIMESTAMP
 );
 
 -- Votes table
 CREATE TABLE votes (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  entry_id UUID REFERENCES entries(id),
-  user_id UUID REFERENCES users(id),
+  id TEXT PRIMARY KEY,
+  entry_id TEXT REFERENCES entries(id),
+  user_id TEXT REFERENCES users(id),
   created_at TIMESTAMP DEFAULT NOW(),
-  UNIQUE(entry_id, user_id) -- one vote per user per entry
+  UNIQUE(entry_id, user_id)
 );
-
--- Indexes
-CREATE INDEX idx_debates_status ON debates(status);
-CREATE INDEX idx_debates_day ON debates(day_number);
-CREATE INDEX idx_entries_debate ON entries(debate_id);
-CREATE INDEX idx_entries_votes ON entries(vote_count DESC);
-CREATE INDEX idx_votes_entry ON votes(entry_id);
 ```
 
 ---
@@ -170,92 +178,72 @@ CREATE INDEX idx_votes_entry ON votes(entry_id);
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | GET | `/api/debates/today` | Get today's active debate |
-| GET | `/api/debates/:id` | Get specific debate with entries |
-| GET | `/api/debates/history` | Get all past debates (paginated) |
 
 ### Entries
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/entries` | Submit entry (runs moderation) |
-| GET | `/api/entries/:debateId` | Get entries for a debate |
+| POST | `/api/entries` | Submit entry (runs AI moderation) |
 
 ### Votes
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/votes` | Cast vote for an entry |
-| DELETE | `/api/votes/:entryId` | Remove vote |
+| DELETE | `/api/votes` | Remove vote |
 
 ### Chat
 | Method | Endpoint | Description |
 |--------|----------|-------------|
-| POST | `/api/chat` | Send message to chatbot |
+| POST | `/api/chat` | Send message to RAG chatbot |
 
-### Admin/Cron
+### Cron (requires CRON_SECRET)
 | Method | Endpoint | Description |
 |--------|----------|-------------|
 | POST | `/api/cron/new-debate` | Generate new daily debate |
-| POST | `/api/cron/close-debate` | Close debate & announce winner |
+| POST | `/api/cron/close-debate` | Close debate, announce winner, sync to KB |
+
+### Testing
+| Method | Endpoint | Description |
+|--------|----------|-------------|
+| GET | `/api/test-spaces` | Test Spaces connectivity |
 
 ---
 
 ## Frontend Pages
 
-### 1. Home Page (`/`)
-- Today's debate topic (large, prominent)
-- Entry submission form (if user hasn't submitted)
-- List of entries with vote buttons
-- Live vote counts
-- Countdown timer to debate close
-- User's current entry highlighted
-
-### 2. Results Page (`/results`)
-- Today's winner announcement with commentary
-- Winning entry prominently displayed
-- Final vote breakdown
-- Winner's profile/stats
-
-### 3. History Page (`/history`)
-- Calendar or list view of past 30 days
-- Click to see any past debate details
-- Filter by category (if tagged)
-- Search past debates
-
-### 4. Leaderboard Page (`/leaderboard`)
-- Top winners (most debate wins)
-- Most popular entries (total votes received)
-- Participation stats
-
-### 5. Chat Page (`/chat`)
-- Chatbot interface
-- Ask questions about past debates
-- Example prompts provided
-- Conversation history
-
-### 6. Profile Page (`/profile`)
-- User's submitted entries
-- Win history
-- Total votes received
-- Badges/achievements (optional)
+| Page | Path | Description |
+|------|------|-------------|
+| Home | `/` | Current debate, submit entry, vote |
+| History | `/history` | List of past debates |
+| Debate Detail | `/history/[id]` | Single debate with all entries |
+| Leaderboard | `/leaderboard` | Top winners |
+| Ask AI | `/chat` | RAG chatbot interface |
+| Sign In | `/auth/signin` | OAuth sign in |
 
 ---
 
-## Daily Automation Flow
+## Daily Automation (DO Functions)
 
+**Schedule (EST - New York Time):**
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│                    MIDNIGHT (00:00)                         │
+│                    8:59 AM EST (13:59 UTC)                  │
 ├─────────────────────────────────────────────────────────────┤
-│ 1. Close yesterday's debate                                 │
-│    - Set status = 'closed'                                  │
-│    - Calculate winner (highest votes)                       │
-│    - Generate winner commentary (Gradient Agent)            │
-│    - Update winner's win_count                              │
-│    - Sync to Knowledge Base                                 │
-│                                                             │
-│ 2. Generate new debate topic                                │
-│    - Call Topic Generator Agent                             │
-│    - Create new debate record                               │
-│    - Set day_number (1-30)                                  │
+│ close-debate function:                                      │
+│ 1. Find active debate                                       │
+│ 2. Determine winner (highest votes)                         │
+│ 3. Generate AI commentary (Serverless Inference)            │
+│ 4. Update winner's wins_count                               │
+│ 5. Upload to Spaces (JSON + TXT)                            │
+│ 6. Set debate status = CLOSED                               │
+└─────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────┐
+│                    9:01 AM EST (14:01 UTC)                  │
+├─────────────────────────────────────────────────────────────┤
+│ new-debate function:                                        │
+│ 1. Generate topic (Serverless Inference)                    │
+│ 2. Create new debate record                                 │
+│ 3. Increment day_number                                     │
 └─────────────────────────────────────────────────────────────┘
 ```
 
@@ -264,95 +252,87 @@ CREATE INDEX idx_votes_entry ON votes(entry_id);
 ## Implementation Phases
 
 ### Phase 1: Foundation (Days 1-3)
-- [ ] Initialize Next.js project with TypeScript
-- [ ] Set up Tailwind CSS
-- [ ] Configure Prisma + PostgreSQL connection
-- [ ] Create database schema and migrations
-- [ ] Set up NextAuth.js with Google/GitHub OAuth
-- [ ] Create basic layout and navigation
+- [x] Initialize Next.js project with TypeScript
+- [x] Set up Tailwind CSS
+- [x] Configure Prisma + PostgreSQL connection
+- [x] Create database schema and migrations
+- [x] Set up NextAuth.js v5 with Google/GitHub OAuth
+- [x] Create basic layout and navigation
 
 ### Phase 2: Core Features (Days 4-7)
-- [ ] Build debate display page
-- [ ] Implement entry submission
-- [ ] Build voting system
-- [ ] Create results page
-- [ ] Build history/archive page
-- [ ] Add leaderboard
+- [x] Build debate display page (Home)
+- [x] Implement entry submission with validation
+- [x] Build voting system
+- [x] Create results/history page
+- [x] Build debate detail page
+- [x] Add leaderboard
 
-### Phase 3: Gradient AI Integration (Days 8-10)
-- [ ] Set up Gradient AI agents:
-  - Topic Generator
-  - Content Moderator
-  - Winner Commentary
-- [ ] Create Knowledge Base for debate history
-- [ ] Build chatbot interface
-- [ ] Connect chatbot to Knowledge Base (RAG)
+### Phase 3: AI Integration (Days 8-10)
+- [x] Set up Serverless Inference client (`src/lib/ai.ts`)
+- [x] Implement AI functions:
+  - [x] Topic Generator
+  - [x] Content Moderator
+  - [x] Winner Commentary
+- [x] Set up Spaces integration (`src/lib/spaces.ts`)
+- [x] Create Gradient Knowledge Base (manual in console)
+- [x] Implement KB retrieval (`src/lib/gradient-kb.ts`)
+- [x] Build chat interface with RAG
 
 ### Phase 4: Automation & Polish (Days 11-13)
-- [ ] Set up daily cron jobs (new debate, close debate)
-- [ ] Add real-time vote updates (optional: WebSockets)
+- [x] Set up DO Functions for cron jobs
+- [x] Deploy functions with scheduled triggers
+- [x] Configure cron schedule (9 AM EST)
+- [ ] Add real-time vote updates (optional)
 - [ ] Mobile-responsive design polish
 - [ ] Add loading states and error handling
 - [ ] Implement rate limiting
 
 ### Phase 5: Deployment & Testing (Days 14-15)
-- [ ] Deploy to DigitalOcean App Platform
-- [ ] Configure environment variables
-- [ ] Set up managed PostgreSQL
-- [ ] Test full flow end-to-end
+- [x] Deploy to DigitalOcean App Platform
+- [x] Configure environment variables
+- [x] Connect to managed PostgreSQL
+- [x] Deploy DO Functions
+- [x] Configure OAuth redirect URLs
+- [x] Test full flow end-to-end
 - [ ] Set up monitoring/logging
 
 ---
 
-## Gradient Knowledge Base Structure
+## Environment Variables
 
-Sync this data daily for the chatbot:
+```bash
+# Database
+DATABASE_URL="postgresql://..."
 
-```json
-{
-  "debate": {
-    "id": "uuid",
-    "day": 15,
-    "date": "2026-01-15",
-    "topic": "Best excuse for being late to work?",
-    "total_entries": 47,
-    "total_votes": 234,
-    "winner": {
-      "user": "john_doe",
-      "entry": "My coffee wasn't ready yet and I have priorities",
-      "votes": 89
-    },
-    "runner_up": {
-      "user": "jane_smith",
-      "entry": "I was busy winning yesterday's debate",
-      "votes": 67
-    },
-    "commentary": "With 89 votes, john_doe's coffee priorities resonated with everyone who's ever hit snooze one too many times!"
-  }
-}
+# NextAuth.js
+NEXTAUTH_URL="https://your-app.ondigitalocean.app"
+NEXTAUTH_SECRET="..."
+AUTH_TRUST_HOST="true"
+
+# OAuth
+GOOGLE_CLIENT_ID="..."
+GOOGLE_CLIENT_SECRET="..."
+GITHUB_CLIENT_ID="..."
+GITHUB_CLIENT_SECRET="..."
+
+# Serverless Inference
+GRADIENT_API_KEY="..."  # Model access key
+GRADIENT_INFERENCE_URL="https://inference.do-ai.run/v1/chat/completions"
+GRADIENT_INFERENCE_MODEL="llama3.3-70b-instruct"
+
+# Gradient Knowledge Base
+GRADIENT_KB_UUID="..."
+DO_API_TOKEN="..."  # With GenAI:read scope
+
+# Spaces
+SPACES_KEY="..."
+SPACES_SECRET="..."
+SPACES_BUCKET="silly-debates"
+SPACES_REGION="nyc3"
+
+# Cron
+CRON_SECRET="..."
 ```
-
----
-
-## Security Considerations
-
-1. **Rate Limiting**
-   - Max 1 entry per user per debate
-   - Max 10 votes per user per debate
-   - API rate limiting (100 req/min)
-
-2. **Input Validation**
-   - Entry max length: 280 characters
-   - Sanitize all user inputs
-   - AI moderation before storing
-
-3. **Authentication**
-   - OAuth only (no passwords to manage)
-   - Session-based auth with secure cookies
-
-4. **Vote Integrity**
-   - Server-side vote validation
-   - Unique constraint on user+entry votes
 
 ---
 
@@ -360,32 +340,52 @@ Sync this data daily for the chatbot:
 
 | Service | Tier | Est. Monthly Cost |
 |---------|------|-------------------|
-| App Platform | Basic ($5) | $5 |
-| Managed PostgreSQL | Basic ($15) | $15 |
-| Gradient AI | Pay-as-you-go | ~$10-20 |
-| **Total** | | **~$30-40/month** |
+| App Platform | Basic | $5 |
+| Managed PostgreSQL | Basic | $15 |
+| Serverless Inference | Pay-as-you-go | ~$5-10 |
+| Spaces | 250GB included | $5 |
+| Functions | 25K invocations free | $0 |
+| Gradient KB | OpenSearch | ~$15 |
+| **Total** | | **~$45-50/month** |
 
 ---
 
-## Optional Enhancements
+## Project Structure
 
-1. **Social Sharing** - Share winning entries on Twitter/social
-2. **Daily Notifications** - Email/push for new debates
-3. **Achievements/Badges** - Gamification elements
-4. **Debate Categories** - Tag topics (food, movies, life, etc.)
-5. **Weekly Recaps** - AI-generated summary of the week
-6. **Anonymous Mode** - Option to hide username on entries
-7. **Reactions** - Beyond votes, add emoji reactions
-
----
-
-## Next Steps
-
-1. Confirm this plan meets your requirements
-2. Set up DigitalOcean account and create:
-   - App Platform project
-   - Managed PostgreSQL database
-   - Gradient AI workspace
-3. Begin Phase 1 implementation
-
-Ready to start building?
+```
+silly-debates/
+├── .claude/
+│   └── agents/           # Claude Code agents
+├── .do/
+│   └── app.yaml          # App Platform spec
+├── functions/
+│   ├── project.yml       # DO Functions config
+│   └── packages/cron/
+│       ├── close-debate/
+│       └── new-debate/
+├── prisma/
+│   └── schema.prisma
+├── src/
+│   ├── app/
+│   │   ├── api/
+│   │   │   ├── auth/
+│   │   │   ├── chat/
+│   │   │   ├── cron/
+│   │   │   ├── debates/
+│   │   │   ├── entries/
+│   │   │   ├── votes/
+│   │   │   └── test-spaces/
+│   │   ├── chat/
+│   │   ├── history/
+│   │   ├── leaderboard/
+│   │   └── auth/
+│   ├── components/
+│   └── lib/
+│       ├── ai.ts
+│       ├── auth.ts
+│       ├── gradient-kb.ts
+│       ├── knowledge-base.ts
+│       ├── prisma.ts
+│       └── spaces.ts
+└── package.json
+```
