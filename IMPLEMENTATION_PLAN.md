@@ -251,7 +251,7 @@ CREATE TABLE votes (
 
 ## Implementation Phases
 
-### Phase 1: Foundation (Days 1-3)
+### Phase 1: Foundation ✅ COMPLETED
 - [x] Initialize Next.js project with TypeScript
 - [x] Set up Tailwind CSS
 - [x] Configure Prisma + PostgreSQL connection
@@ -259,7 +259,7 @@ CREATE TABLE votes (
 - [x] Set up NextAuth.js v5 with Google/GitHub OAuth
 - [x] Create basic layout and navigation
 
-### Phase 2: Core Features (Days 4-7)
+### Phase 2: Core Features ✅ COMPLETED
 - [x] Build debate display page (Home)
 - [x] Implement entry submission with validation
 - [x] Build voting system
@@ -267,7 +267,7 @@ CREATE TABLE votes (
 - [x] Build debate detail page
 - [x] Add leaderboard
 
-### Phase 3: AI Integration (Days 8-10)
+### Phase 3: AI Integration ✅ COMPLETED
 - [x] Set up Serverless Inference client (`src/lib/ai.ts`)
 - [x] Implement AI functions:
   - [x] Topic Generator
@@ -278,23 +278,182 @@ CREATE TABLE votes (
 - [x] Implement KB retrieval (`src/lib/gradient-kb.ts`)
 - [x] Build chat interface with RAG
 
-### Phase 4: Automation & Polish (Days 11-13)
+### Phase 4: Automation & Polish (Partial) ✅ COMPLETED
 - [x] Set up DO Functions for cron jobs
 - [x] Deploy functions with scheduled triggers
 - [x] Configure cron schedule (9 AM EST)
-- [ ] Add real-time vote updates (optional)
-- [ ] Mobile-responsive design polish
-- [ ] Add loading states and error handling
-- [ ] Implement rate limiting
 
-### Phase 5: Deployment & Testing (Days 14-15)
+### Phase 5: Deployment & Testing (Partial) ✅ COMPLETED
 - [x] Deploy to DigitalOcean App Platform
 - [x] Configure environment variables
 - [x] Connect to managed PostgreSQL
 - [x] Deploy DO Functions
 - [x] Configure OAuth redirect URLs
 - [x] Test full flow end-to-end
-- [ ] Set up monitoring/logging
+
+---
+
+## Remaining Work (Parallelizable Sub-Agent Tasks)
+
+The following tasks are independent and can be executed **in parallel** by sub-agents. Each task has clear boundaries and minimal dependencies.
+
+### Task A: Real-Time Vote Updates (Optional)
+**Agent Type:** `phase-4-implementer`
+**Dependencies:** None
+**Files to modify:**
+- `src/app/page.tsx` (home page)
+- `src/app/api/votes/route.ts`
+- `src/components/` (new WebSocket or polling component)
+
+**Scope:**
+- [ ] Implement real-time vote count updates using one of:
+  - Server-Sent Events (SSE) - simpler
+  - WebSocket connection - more complex
+  - Polling with SWR/React Query - simplest
+- [ ] Update vote counts on home page without full page refresh
+- [ ] Handle optimistic updates for better UX
+
+**Acceptance Criteria:**
+- Vote counts update within 5 seconds of another user voting
+- No page refresh required
+- Graceful fallback if real-time fails
+
+---
+
+### Task B: Mobile-Responsive Design Polish
+**Agent Type:** `phase-4-implementer`
+**Dependencies:** None
+**Files to modify:**
+- `src/app/globals.css`
+- `src/app/page.tsx`
+- `src/app/history/page.tsx`
+- `src/app/leaderboard/page.tsx`
+- `src/app/chat/page.tsx`
+- `src/components/*.tsx`
+
+**Scope:**
+- [ ] Audit all pages for mobile breakpoints (sm, md, lg)
+- [ ] Fix any overflow issues on small screens
+- [ ] Ensure touch targets are at least 44x44px
+- [ ] Test navigation on mobile viewports
+- [ ] Optimize card layouts for mobile (stack vs grid)
+- [ ] Ensure forms are usable on mobile keyboards
+
+**Acceptance Criteria:**
+- All pages render correctly on 320px-768px viewports
+- No horizontal scrolling on mobile
+- All interactive elements are touch-friendly
+
+---
+
+### Task C: Loading States & Error Handling
+**Agent Type:** `phase-4-implementer`
+**Dependencies:** None
+**Files to modify:**
+- `src/app/page.tsx`
+- `src/app/history/page.tsx`
+- `src/app/history/[id]/page.tsx`
+- `src/app/leaderboard/page.tsx`
+- `src/app/chat/page.tsx`
+- `src/components/` (new loading/error components)
+
+**Scope:**
+- [ ] Add loading skeletons for all data-fetching pages
+- [ ] Implement error boundaries for React components
+- [ ] Add user-friendly error messages for API failures
+- [ ] Add retry buttons for failed requests
+- [ ] Handle empty states gracefully (no debates, no entries, etc.)
+- [ ] Add loading indicators for form submissions
+
+**Acceptance Criteria:**
+- Users see loading feedback within 100ms of navigation
+- All API errors show actionable error messages
+- Empty states have helpful guidance text
+
+---
+
+### Task D: Rate Limiting
+**Agent Type:** `phase-4-implementer`
+**Dependencies:** None
+**Files to modify:**
+- `src/lib/rate-limit.ts` (new file)
+- `src/app/api/entries/route.ts`
+- `src/app/api/votes/route.ts`
+- `src/app/api/chat/route.ts`
+
+**Scope:**
+- [ ] Create rate limiting middleware/utility
+- [ ] Apply rate limits to entry submission (e.g., 5 per hour)
+- [ ] Apply rate limits to voting (e.g., 30 per minute)
+- [ ] Apply rate limits to chat API (e.g., 20 per minute)
+- [ ] Return appropriate 429 status codes with retry-after headers
+- [ ] Consider using Upstash Redis for distributed rate limiting (optional)
+
+**Acceptance Criteria:**
+- Rate limits are enforced per user (authenticated) or IP (anonymous)
+- Clear error messages when rate limited
+- Rate limits are configurable via environment variables
+
+---
+
+### Task E: Monitoring & Logging
+**Agent Type:** `phase-5-implementer`
+**Dependencies:** None
+**Files to modify:**
+- `src/lib/logger.ts` (new file)
+- `src/app/api/*/route.ts` (all API routes)
+- `.do/app.yaml` (logging configuration)
+
+**Scope:**
+- [ ] Set up structured logging utility
+- [ ] Add request/response logging to API routes
+- [ ] Log AI API calls (topic generation, moderation, chat)
+- [ ] Log cron job executions and results
+- [ ] Configure DigitalOcean App Platform logging
+- [ ] Add error tracking (optional: integrate Sentry or similar)
+- [ ] Create health check endpoint (`/api/health`)
+
+**Acceptance Criteria:**
+- All API requests are logged with timestamp, user, and duration
+- Errors include stack traces in logs
+- Logs are viewable in DigitalOcean console
+
+---
+
+## Sub-Agent Execution Guide
+
+### Parallel Execution Matrix
+```
+┌─────────────────────────────────────────────────────────────────┐
+│                    PARALLELIZABLE TASKS                         │
+├─────────────────────────────────────────────────────────────────┤
+│                                                                 │
+│  ┌──────────┐  ┌──────────┐  ┌──────────┐  ┌──────────┐        │
+│  │ Task A   │  │ Task B   │  │ Task C   │  │ Task D   │        │
+│  │ Real-    │  │ Mobile   │  │ Loading/ │  │ Rate     │        │
+│  │ time     │  │ Resp.    │  │ Error    │  │ Limiting │        │
+│  │ Updates  │  │ Design   │  │ Handling │  │          │        │
+│  └──────────┘  └──────────┘  └──────────┘  └──────────┘        │
+│       │             │             │             │               │
+│       └─────────────┴─────────────┴─────────────┘               │
+│                           │                                     │
+│                           ▼                                     │
+│                    ┌──────────┐                                 │
+│                    │ Task E   │                                 │
+│                    │ Monitor/ │  (Can also run in parallel,    │
+│                    │ Logging  │   but benefits from seeing      │
+│                    └──────────┘   other task patterns)          │
+│                                                                 │
+└─────────────────────────────────────────────────────────────────┘
+```
+
+### Agent Instructions
+1. **Check out a fresh branch** for your task (e.g., `feature/task-a-realtime-votes`)
+2. **Read the scope** and files listed for your task
+3. **Implement incrementally** with tests where applicable
+4. **Do not modify files** outside your task scope unless necessary
+5. **Mark checkboxes** in this file as you complete items
+6. **Create a PR** when complete with task letter in title (e.g., "Task B: Mobile responsive polish")
 
 ---
 
