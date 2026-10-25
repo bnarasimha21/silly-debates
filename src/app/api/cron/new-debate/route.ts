@@ -21,7 +21,8 @@ export async function POST(request: NextRequest) {
     const authHeader = request.headers.get("authorization");
     const providedSecret = authHeader?.replace("Bearer ", "");
 
-    if (CRON_SECRET && providedSecret !== CRON_SECRET) {
+    // Fail closed: if CRON_SECRET is not configured, nobody may trigger the cron.
+    if (!CRON_SECRET || providedSecret !== CRON_SECRET) {
       return NextResponse.json(
         { error: "Unauthorized" },
         { status: 401 }

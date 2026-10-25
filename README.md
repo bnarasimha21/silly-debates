@@ -19,7 +19,7 @@ A fun, month-long daily debate game where users submit creative entries, vote on
 
 | Layer | Technology |
 |-------|------------|
-| Frontend | Next.js 14 (App Router) |
+| Frontend | Next.js 16 (App Router) |
 | Styling | Tailwind CSS |
 | Backend | Next.js API Routes |
 | Database | PostgreSQL (DigitalOcean Managed) |
@@ -33,7 +33,7 @@ A fun, month-long daily debate game where users submit creative entries, vote on
 
 ### Prerequisites
 
-- Node.js 18+
+- Node.js 20.9+ (required by Next.js 16)
 - PostgreSQL database
 - DigitalOcean account (for AI features)
 
@@ -85,7 +85,7 @@ See `.env.example` for all required variables:
 - `SPACES_KEY/SECRET` - DigitalOcean Spaces credentials
 - `GRADIENT_KB_UUID` - Knowledge Base UUID
 - `DO_API_TOKEN` - DigitalOcean API token (GenAI:read scope)
-- `CRON_SECRET` - Secret for cron job authentication
+- `CRON_SECRET` - Secret for cron job authentication. Required: the `/api/cron/*` POST routes return 401 if it is unset.
 
 ## API Endpoints
 
