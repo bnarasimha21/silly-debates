@@ -1,5 +1,8 @@
 import { prisma } from "@/lib/prisma";
 import Image from "next/image";
+import Link from "next/link";
+import { ShareButtons } from "@/components/share-buttons";
+import { debateLabel } from "@/lib/site";
 
 // Force dynamic rendering to always fetch fresh data
 export const dynamic = "force-dynamic";
@@ -56,7 +59,10 @@ async function getLatestResult() {
 
   return {
     topic: debate.topic,
+    season: debate.season,
     dayNumber: debate.dayNumber,
+    debateId: debate.id,
+    entryId: debate.winningEntry.id,
     entry: debate.winningEntry.content,
     user: {
       name: debate.winningEntry.user.name || "Anonymous",
@@ -100,7 +106,7 @@ export default async function ResultsPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Latest Winner
         </h1>
-        <p className="text-gray-600">Day {winner.dayNumber} Results</p>
+        <p className="text-gray-600">{debateLabel(winner.season, winner.dayNumber)} Results</p>
       </div>
 
       {/* Winner Card */}
@@ -153,6 +159,22 @@ export default async function ResultsPage() {
       </div>
 
       {/* AI Commentary */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 mb-8">
+        <p className="text-sm font-medium text-gray-700 mb-3">Share the winning answer</p>
+        <ShareButtons
+          path={`/e/${winner.entryId}`}
+          text={`"${winner.topic}" The winning answer on Silly Debates:`}
+          entryId={winner.entryId}
+          debateId={winner.debateId}
+        />
+        <Link
+          href={`/d/${winner.debateId}`}
+          className="inline-block mt-4 text-sm text-purple-600 hover:text-purple-800"
+        >
+          See every answer from this debate
+        </Link>
+      </div>
+
       {winner.commentary && (
         <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
           <div className="flex items-center gap-2 mb-3">

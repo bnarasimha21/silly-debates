@@ -73,7 +73,8 @@ model User {
 model Debate {
   id               String       @id @default(cuid())
   topic            String
-  dayNumber        Int          @unique // 1-30
+  season           Int          @default(1)
+  dayNumber        Int // 1-30 within a season
   status           DebateStatus @default(ACTIVE)
   createdAt        DateTime     @default(now())
   closedAt         DateTime?
@@ -86,8 +87,9 @@ model Debate {
   // All entries for this debate
   entries Entry[] @relation("DebateEntries")
 
+  @@unique([season, dayNumber])
   @@index([status])
-  @@index([dayNumber])
+  @@index([createdAt])
 }
 
 enum DebateStatus {
@@ -128,10 +130,37 @@ model Vote {
   entryId String
   entry   Entry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // A vote belongs to a signed-in user or to an anonymous visitor, never both.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // One vote per user per entry
+  visitorId String? // anonymous visitor cookie id
+  ipHash    String? // salted hash of the voter's IP, anonymous votes only
+
+  // One vote per voter per entry
   @@unique([entryId, userId])
+  @@unique([entryId, visitorId])
   @@index([entryId])
+  @@index([visitorId])
+}
+
+// ============================================
+// Analytics
+// ============================================
+
+// One row per tracked action. visitorId is the anonymous cookie id.
+model Event {
+  id        String   @id @default(cuid())
+  name      String
+  visitorId String?
+  userId    String?
+  debateId  String?
+  entryId   String?
+  ref       String? // short code of the visitor whose shared link was followed
+  props     Json?
+  createdAt DateTime @default(now())
+
+  @@index([name, createdAt])
+  @@index([visitorId, createdAt])
+  @@index([createdAt])
 }

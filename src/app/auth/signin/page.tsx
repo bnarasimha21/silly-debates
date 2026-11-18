@@ -1,12 +1,26 @@
-import { signIn } from "@/lib/auth";
+import { emailSignInEnabled, signIn } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { track } from "@/lib/track";
+import { getVisitorId } from "@/lib/visitor";
 
-export default async function SignInPage() {
+/** Only same-site paths are accepted as a place to return to. */
+function safePath(value: string | undefined): string {
+  return value && /^\/(?!\/)[\w\-./]*$/.test(value) ? value : "/";
+}
+
+export default async function SignInPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ callbackUrl?: string; reason?: string }>;
+}) {
+  const query = await searchParams;
+  const redirectTo = safePath(query.callbackUrl);
+  const postingAnswer = query.reason === "submit";
   const session = await auth();
 
   if (session) {
-    redirect("/");
+    redirect(redirectTo);
   }
 
   return (
@@ -17,7 +31,9 @@ export default async function SignInPage() {
             Silly Debates
           </h1>
           <p className="text-gray-600">
-            Sign in to join the fun and cast your votes!
+            {postingAnswer
+              ? "Sign in to post your answer. It's saved and will be waiting for you."
+              : "Sign in to post answers and keep track of your wins."}
           </p>
         </div>
 
@@ -25,7 +41,11 @@ export default async function SignInPage() {
           <form
             action={async () => {
               "use server";
-              await signIn("google", { redirectTo: "/" });
+              await track("signin_start", {
+                visitorId: await getVisitorId(),
+                props: { provider: "google" },
+              });
+              await signIn("google", { redirectTo });
             }}
           >
             <button
@@ -54,10 +74,52 @@ export default async function SignInPage() {
             </button>
           </form>
 
+          {emailSignInEnabled && (
+            <form
+              action={async (formData: FormData) => {
+                "use server";
+                await track("signin_start", {
+                  visitorId: await getVisitorId(),
+                  props: { provider: "email" },
+                });
+                await signIn("resend", {
+                  email: String(formData.get("email") || ""),
+                  redirectTo,
+                });
+              }}
+              className="space-y-2"
+            >
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700">
+                Or get a sign-in link by email
+              </label>
+              <div className="flex gap-2">
+                <input
+                  id="email"
+                  name="email"
+                  type="email"
+                  required
+                  autoComplete="email"
+                  placeholder="you@example.com"
+                  className="flex-1 min-w-0 px-4 py-3 border-2 border-gray-200 rounded-lg text-gray-800 focus:outline-none focus:border-purple-500"
+                />
+                <button
+                  type="submit"
+                  className="px-4 py-3 rounded-lg bg-purple-600 text-white font-medium hover:bg-purple-700 transition-all whitespace-nowrap"
+                >
+                  Email me
+                </button>
+              </div>
+            </form>
+          )}
+
           <form
             action={async () => {
               "use server";
-              await signIn("github", { redirectTo: "/" });
+              await track("signin_start", {
+                visitorId: await getVisitorId(),
+                props: { provider: "github" },
+              });
+              await signIn("github", { redirectTo });
             }}
           >
             <button

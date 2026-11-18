@@ -1,90 +1,44 @@
-import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { getDebateForViewer, getViewer } from "@/lib/debates";
+import { debateLabel } from "@/lib/site";
 import { DebateView } from "@/components/debate-view";
-import type { Debate } from "@/types";
+import { WinBanner } from "@/components/win-banner";
 
 /**
- * Fetch today's active debate with entries
- * Includes vote status if user is authenticated
+ * If the signed-in user won the most recent closed debate, return what is
+ * needed to prompt them to share the win.
  */
-async function getTodaysDebate(userId?: string): Promise<Debate | null> {
-  const debate = await prisma.debate.findFirst({
-    where: {
-      status: "ACTIVE",
-    },
-    include: {
-      entries: {
-        where: {
-          approved: true,
-        },
-        include: {
-          user: {
-            select: {
-              id: true,
-              name: true,
-              image: true,
-            },
-          },
-          votes: userId
-            ? {
-                where: {
-                  userId: userId,
-                },
-                select: {
-                  id: true,
-                },
-              }
-            : false,
-        },
-        orderBy: {
-          voteCount: "desc",
-        },
-      },
+async function getRecentWin(userId: string | null) {
+  if (!userId) return null;
+  const latest = await prisma.debate.findFirst({
+    where: { status: "CLOSED", winningEntryId: { not: null } },
+    orderBy: { closedAt: "desc" },
+    select: {
+      season: true,
+      dayNumber: true,
+      topic: true,
+      winningEntry: { select: { id: true, userId: true } },
     },
   });
-
-  if (!debate) {
-    return null;
-  }
-
-  // Transform the response to match our Debate type
-  const entriesWithVoteStatus = debate.entries.map((entry) => ({
-    id: entry.id,
-    content: entry.content,
-    voteCount: entry.voteCount,
-    createdAt: entry.createdAt.toISOString(),
-    user: {
-      id: entry.user.id,
-      name: entry.user.name,
-      image: entry.user.image,
-    },
-    hasVoted: userId ? (entry.votes as { id: string }[])?.length > 0 : false,
-    isOwnEntry: userId ? entry.userId === userId : false,
-  }));
-
-  // Check if user already submitted an entry
-  const userEntry = userId
-    ? debate.entries.find((e) => e.userId === userId)
-    : null;
-
+  if (!latest?.winningEntry || latest.winningEntry.userId !== userId) return null;
   return {
-    id: debate.id,
-    topic: debate.topic,
-    dayNumber: debate.dayNumber,
-    status: debate.status,
-    createdAt: debate.createdAt.toISOString(),
-    entries: entriesWithVoteStatus,
-    userHasSubmitted: !!userEntry,
-    userEntryId: userEntry?.id || null,
+    entryId: latest.winningEntry.id,
+    topic: latest.topic,
+    label: debateLabel(latest.season, latest.dayNumber),
   };
 }
 
 export default async function HomePage() {
-  const session = await auth();
-  const userId = session?.user?.id;
+  const viewer = await getViewer();
+  const [debate, win] = await Promise.all([
+    getDebateForViewer(viewer),
+    getRecentWin(viewer.userId),
+  ]);
 
-  // Fetch debate data on the server
-  const debate = await getTodaysDebate(userId);
-
-  return <DebateView initialDebate={debate} />;
+  return (
+    <>
+      {win && <WinBanner {...win} />}
+      <DebateView initialDebate={debate} />
+    </>
+  );
 }

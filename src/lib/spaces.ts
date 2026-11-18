@@ -35,6 +35,7 @@ export function isSpacesConfigured(): boolean {
  */
 export interface DebateKBData {
   id: string;
+  season: number;
   dayNumber: number;
   date: string;
   topic: string;
@@ -58,6 +59,12 @@ export interface DebateKBData {
   }[];
 }
 
+/** File stem for a debate. Season 1 keeps its original "day-NN" names. */
+function debateFileStem(debate: Pick<DebateKBData, "season" | "dayNumber">): string {
+  const day = debate.dayNumber.toString().padStart(2, "0");
+  return debate.season > 1 ? `debates/s${debate.season}-day-${day}` : `debates/day-${day}`;
+}
+
 /**
  * Upload a single debate's data to Spaces
  */
@@ -67,7 +74,7 @@ export async function uploadDebateToSpaces(debate: DebateKBData): Promise<void> 
     return;
   }
 
-  const fileName = `debates/day-${debate.dayNumber.toString().padStart(2, "0")}.json`;
+  const fileName = `${debateFileStem(debate)}.json`;
 
   const content = JSON.stringify(debate, null, 2);
 
@@ -103,6 +110,7 @@ export async function uploadDebateSummaryToSpaces(debates: DebateKBData[]): Prom
     totalEntries: debates.reduce((sum, d) => sum + d.totalEntries, 0),
     totalVotes: debates.reduce((sum, d) => sum + d.totalVotes, 0),
     debates: debates.map((d) => ({
+      season: d.season,
       dayNumber: d.dayNumber,
       date: d.date,
       topic: d.topic,
@@ -139,7 +147,7 @@ export async function uploadDebateAsTextToSpaces(debate: DebateKBData): Promise<
   }
 
   const textContent = `
-Silly Debates - Day ${debate.dayNumber}
+Silly Debates - Season ${debate.season}, Day ${debate.dayNumber}
 Date: ${debate.date}
 Topic: "${debate.topic}"
 
@@ -161,7 +169,7 @@ Top Entries:
 ${debate.topEntries.map((e, i) => `${i + 1}. ${e.userName}: "${e.entry}" (${e.votes} votes)`).join("\n")}
 `.trim();
 
-  const fileName = `debates/day-${debate.dayNumber.toString().padStart(2, "0")}.txt`;
+  const fileName = `${debateFileStem(debate)}.txt`;
 
   try {
     await s3Client.send(

@@ -2,6 +2,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { redirect } from "next/navigation";
 import Image from "next/image";
+import { debateLabel } from "@/lib/site";
 
 interface UserEntry {
   id: string;
@@ -9,6 +10,7 @@ interface UserEntry {
   content: string;
   voteCount: number;
   isWinner: boolean;
+  season: number;
   dayNumber: number;
 }
 
@@ -37,6 +39,7 @@ async function getUserProfileData(userId: string): Promise<{
           debate: {
             select: {
               topic: true,
+              season: true,
               dayNumber: true,
               winningEntryId: true,
             },
@@ -80,6 +83,7 @@ async function getUserProfileData(userId: string): Promise<{
     content: entry.content,
     voteCount: entry.voteCount,
     isWinner: entry.debate.winningEntryId === entry.id,
+    season: entry.debate.season,
     dayNumber: entry.debate.dayNumber,
   }));
 
@@ -180,7 +184,7 @@ export default async function ProfilePage() {
                   <div className="flex-1">
                     <div className="flex items-center gap-2 mb-2">
                       <span className="bg-purple-100 text-purple-700 text-xs font-medium px-2 py-1 rounded-full">
-                        Day {entry.dayNumber}
+                        {debateLabel(entry.season, entry.dayNumber)}
                       </span>
                       {entry.isWinner && (
                         <span className="bg-yellow-100 text-yellow-700 text-xs font-medium px-2 py-1 rounded-full flex items-center gap-1">

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateWinnerCommentary } from "@/lib/ai";
+import { pickWinner } from "@/lib/winner";
 import {
   uploadDebateToSpaces,
   uploadDebateAsTextToSpaces,
@@ -41,21 +42,6 @@ export async function POST(request: NextRequest) {
     // Find the active debate
     const activeDebate = await prisma.debate.findFirst({
       where: { status: "ACTIVE" },
-      include: {
-        entries: {
-          where: { approved: true },
-          orderBy: { voteCount: "desc" },
-          take: 1,
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-      },
     });
 
     if (!activeDebate) {
@@ -65,8 +51,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Determine the winner
-    const winningEntry = activeDebate.entries[0];
+    // Determine the winner (see pickWinner for the tie-break rules)
+    const winningEntry = await pickWinner(activeDebate.id);
 
     let winnerCommentary: string | null = null;
 
@@ -134,7 +120,7 @@ export async function POST(request: NextRequest) {
         // Get top entries for KB
         const topEntries = await prisma.entry.findMany({
           where: { debateId: activeDebate.id, approved: true },
-          orderBy: { voteCount: "desc" },
+          orderBy: [{ voteCount: "desc" }, { createdAt: "asc" }],
           take: 5,
           include: {
             user: { select: { name: true } },
@@ -145,6 +131,7 @@ export async function POST(request: NextRequest) {
 
         const debateKBData: DebateKBData = {
           id: closedDebate.id,
+          season: closedDebate.season,
           dayNumber: closedDebate.dayNumber,
           date: closedDebate.closedAt?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
           topic: closedDebate.topic,
@@ -190,6 +177,7 @@ export async function POST(request: NextRequest) {
       debate: {
         id: closedDebate.id,
         topic: closedDebate.topic,
+        season: closedDebate.season,
         dayNumber: closedDebate.dayNumber,
         closedAt: closedDebate.closedAt,
         totalEntries: closedDebate._count.entries,
@@ -225,7 +213,7 @@ export async function GET() {
       include: {
         entries: {
           where: { approved: true },
-          orderBy: { voteCount: "desc" },
+          orderBy: [{ voteCount: "desc" }, { createdAt: "asc" }],
           take: 5,
           include: {
             user: {

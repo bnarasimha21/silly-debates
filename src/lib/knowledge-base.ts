@@ -6,6 +6,7 @@
  */
 
 import { prisma } from "./prisma";
+import { SEASON_LENGTH } from "./site";
 import type { DebateContext } from "./ai";
 
 /**
@@ -14,7 +15,7 @@ import type { DebateContext } from "./ai";
 export async function getDebateHistory(): Promise<DebateContext> {
   // Fetch all debates with winners
   const debates = await prisma.debate.findMany({
-    orderBy: { dayNumber: "desc" },
+    orderBy: { createdAt: "desc" },
     include: {
       winningEntry: {
         include: {
@@ -105,23 +106,30 @@ export async function getPreviousTopics(): Promise<string[]> {
       topic: true,
     },
     orderBy: {
-      dayNumber: "desc",
+      createdAt: "desc",
     },
+    // Enough history to avoid repeats without growing the prompt forever.
+    take: 120,
   });
 
   return debates.map((d) => d.topic);
 }
 
 /**
- * Get the next day number for a new debate
+ * Get the season and day number for the next debate.
+ * After the last day of a season, the next debate is Day 1 of a new season.
  */
-export async function getNextDayNumber(): Promise<number> {
+export async function getNextDebateSlot(): Promise<{ season: number; dayNumber: number }> {
   const lastDebate = await prisma.debate.findFirst({
-    orderBy: { dayNumber: "desc" },
-    select: { dayNumber: true },
+    orderBy: [{ season: "desc" }, { dayNumber: "desc" }],
+    select: { season: true, dayNumber: true },
   });
 
-  return (lastDebate?.dayNumber || 0) + 1;
+  if (!lastDebate) return { season: 1, dayNumber: 1 };
+  if (lastDebate.dayNumber >= SEASON_LENGTH) {
+    return { season: lastDebate.season + 1, dayNumber: 1 };
+  }
+  return { season: lastDebate.season, dayNumber: lastDebate.dayNumber + 1 };
 }
 
 /**
@@ -159,7 +167,7 @@ export async function searchDebates(query: string): Promise<DebateContext["debat
         mode: "insensitive",
       },
     },
-    orderBy: { dayNumber: "desc" },
+    orderBy: { createdAt: "desc" },
     include: {
       winningEntry: {
         include: {
@@ -211,9 +219,9 @@ export async function searchDebates(query: string): Promise<DebateContext["debat
 /**
  * Get debate by day number
  */
-export async function getDebateByDay(dayNumber: number) {
+export async function getDebateByDay(dayNumber: number, season = 1) {
   return prisma.debate.findUnique({
-    where: { dayNumber },
+    where: { season_dayNumber: { season, dayNumber } },
     include: {
       winningEntry: {
         include: {

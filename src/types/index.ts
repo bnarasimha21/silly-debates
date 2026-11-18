@@ -19,6 +19,7 @@ export interface Entry {
 export interface Debate {
   id: string;
   topic: string;
+  season: number;
   dayNumber: number;
   status: "ACTIVE" | "CLOSED";
   createdAt: string;
