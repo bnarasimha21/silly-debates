@@ -4,8 +4,9 @@ import { useState, useTransition } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
-import type { Debate, Entry, VoteResponse, EntryResponse } from "@/types";
+import type { Debate, Entry, EntryResponse } from "@/types";
 import { debateLabel, SEASON_LENGTH } from "@/lib/site";
+import { ShareButtons } from "./share-buttons";
 
 interface DebateViewProps {
   initialDebate: Debate | null;
@@ -20,6 +21,8 @@ export function DebateView({ initialDebate }: DebateViewProps) {
   const [sortBy, setSortBy] = useState<SortOption>("votes");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [submitError, setSubmitError] = useState<string | null>(null);
+  // The entry the person just submitted; drives the "share it" dialog.
+  const [justSubmitted, setJustSubmitted] = useState<EntryResponse | null>(null);
   const [isPending, startTransition] = useTransition();
 
   // Loading state while auth is being checked
@@ -95,6 +98,7 @@ export function DebateView({ initialDebate }: DebateViewProps) {
       });
 
       setEntryContent("");
+      setJustSubmitted(newEntry);
     } catch (error) {
       setSubmitError(
         error instanceof Error ? error.message : "Failed to submit entry"
@@ -246,6 +250,43 @@ export function DebateView({ initialDebate }: DebateViewProps) {
 
   return (
     <div className="max-w-4xl mx-auto px-4 py-8">
+      {/* Share prompt shown right after submitting */}
+      {justSubmitted && (
+        <div
+          className="fixed inset-0 z-50 flex items-end sm:items-center justify-center bg-black/50 p-4"
+          role="dialog"
+          aria-modal="true"
+          aria-labelledby="share-dialog-title"
+          onClick={() => setJustSubmitted(null)}
+        >
+          <div
+            className="bg-white rounded-2xl shadow-xl w-full max-w-md p-6"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 id="share-dialog-title" className="text-xl font-bold text-gray-900 mb-1">
+              Your answer is live
+            </h2>
+            <p className="text-gray-600 mb-4">Share it to get votes.</p>
+            <p className="bg-purple-50 border border-purple-100 rounded-xl p-4 text-gray-800 mb-4">
+              &ldquo;{justSubmitted.content}&rdquo;
+            </p>
+            <ShareButtons
+              path={`/e/${justSubmitted.id}`}
+              text={`"${debate.topic}" Vote for my answer on Silly Debates:`}
+              entryId={justSubmitted.id}
+              debateId={debate.id}
+            />
+            <button
+              type="button"
+              onClick={() => setJustSubmitted(null)}
+              className="w-full mt-4 text-sm text-gray-500 hover:text-gray-800"
+            >
+              Not now
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Hero Section */}
       <div className="text-center mb-12">
         <div className="inline-block bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 px-4 py-1 rounded-full text-sm font-medium mb-4">
@@ -270,7 +311,7 @@ export function DebateView({ initialDebate }: DebateViewProps) {
           <h2 className="text-lg font-semibold text-gray-800 mb-4">
             Submit Your Answer
           </h2>
-          <form onSubmit={handleSubmitEntry} className="flex gap-4">
+          <form onSubmit={handleSubmitEntry} className="flex flex-col sm:flex-row gap-3 sm:gap-4">
             <input
               type="text"
               value={entryContent}
@@ -280,7 +321,7 @@ export function DebateView({ initialDebate }: DebateViewProps) {
               }}
               placeholder="Type your silly answer..."
               maxLength={280}
-              className="flex-1 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+              className="flex-1 min-w-0 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
               disabled={isSubmitting}
             />
             <button
@@ -409,8 +450,13 @@ export function DebateView({ initialDebate }: DebateViewProps) {
 
                   {/* Entry Content */}
                   <div className="flex-1">
-                    <p className="text-gray-800 text-lg">{entry.content}</p>
-                    <div className="flex items-center gap-2 mt-2">
+                    <Link
+                      href={`/e/${entry.id}`}
+                      className="block text-gray-800 text-lg hover:text-purple-700"
+                    >
+                      {entry.content}
+                    </Link>
+                    <div className="flex flex-wrap items-center gap-x-2 gap-y-1 mt-2">
                       {entry.user.image ? (
                         <Image
                           src={entry.user.image}
@@ -431,6 +477,19 @@ export function DebateView({ initialDebate }: DebateViewProps) {
                             (You)
                           </span>
                         )}
+                      </span>
+                      <span className="ml-auto">
+                        <ShareButtons
+                          path={`/e/${entry.id}`}
+                          text={
+                            entry.isOwnEntry
+                              ? `"${debate.topic}" Vote for my answer on Silly Debates:`
+                              : `"${debate.topic}" This answer on Silly Debates:`
+                          }
+                          entryId={entry.id}
+                          debateId={debate.id}
+                          variant="compact"
+                        />
                       </span>
                     </div>
                   </div>
@@ -459,7 +518,7 @@ export function DebateView({ initialDebate }: DebateViewProps) {
       {/* Countdown Timer Placeholder */}
       <div className="mt-8 text-center">
         <p className="text-gray-500 text-sm">
-          Voting closes at midnight. Winner announced on the Results page!
+          Voting closes once a day. The winner is announced on the Results page.
         </p>
       </div>
     </div>

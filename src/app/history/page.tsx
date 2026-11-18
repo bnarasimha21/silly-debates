@@ -97,7 +97,7 @@ export default async function HistoryPage() {
           {pastDebates.map((debate) => (
             <Link
               key={debate.id}
-              href={`/history/${debate.id}`}
+              href={`/d/${debate.id}`}
               className="block bg-white rounded-xl shadow-sm border border-gray-100 p-5 hover:shadow-md transition-shadow"
             >
               <div className="flex items-start justify-between gap-4">
