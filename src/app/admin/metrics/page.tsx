@@ -64,6 +64,36 @@ export default async function MetricsPage() {
         ))}
       </div>
 
+      <h2 className="text-lg font-semibold text-gray-800 mb-1">Votes by debate</h2>
+      <p className="text-sm text-gray-500 mb-3">
+        Many anonymous votes from few networks suggests vote stuffing.
+      </p>
+      <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto mb-8">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="text-left text-gray-500 border-b border-gray-100">
+              <th className="px-4 py-3 font-medium">Debate</th>
+              <th className="px-4 py-3 font-medium text-right">Signed-in votes</th>
+              <th className="px-4 py-3 font-medium text-right">Anonymous votes</th>
+              <th className="px-4 py-3 font-medium text-right">Networks</th>
+            </tr>
+          </thead>
+          <tbody>
+            {m.voteSplit.map((d) => (
+              <tr key={d.id} className="border-b border-gray-50 last:border-0 text-gray-800">
+                <td className="px-4 py-2">
+                  <span className="font-medium whitespace-nowrap">{d.label}</span>
+                  <span className="text-gray-500"> · {d.topic}</span>
+                </td>
+                <td className="px-4 py-2 text-right tabular-nums">{d.signedIn}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{d.anonymous}</td>
+                <td className="px-4 py-2 text-right tabular-nums">{d.networks}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+
       <h2 className="text-lg font-semibold text-gray-800 mb-3">Daily</h2>
       <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-x-auto">
         <table className="w-full text-sm">

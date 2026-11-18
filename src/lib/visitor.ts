@@ -81,3 +81,8 @@ export async function ensureVisitorId(): Promise<string> {
 export function cleanRef(value: unknown): string | null {
   return typeof value === "string" && /^[0-9a-f]{12}$/.test(value) ? value : null;
 }
+
+/** Salted hash of an IP address. The raw address is never stored. */
+export function hashIp(ip: string): string {
+  return createHmac("sha256", secret()).update(`ip:${ip}`).digest("base64url").slice(0, 32);
+}

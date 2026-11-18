@@ -1,12 +1,16 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useEffect, useState, useTransition } from "react";
 import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
 import type { Debate, Entry, EntryResponse } from "@/types";
 import { debateLabel, SEASON_LENGTH } from "@/lib/site";
 import { ShareButtons } from "./share-buttons";
+import { sendVote } from "@/lib/vote-client";
+
+/** Where an answer typed before signing in is kept across the sign-in round trip. */
+const DRAFT_KEY = "sd_draft";
 
 interface DebateViewProps {
   initialDebate: Debate | null;
@@ -23,7 +27,27 @@ export function DebateView({ initialDebate }: DebateViewProps) {
   const [submitError, setSubmitError] = useState<string | null>(null);
   // The entry the person just submitted; drives the "share it" dialog.
   const [justSubmitted, setJustSubmitted] = useState<EntryResponse | null>(null);
+  const [voteError, setVoteError] = useState<string | null>(null);
+  const [draftRestored, setDraftRestored] = useState(false);
   const [isPending, startTransition] = useTransition();
+
+  // After signing in, bring back the answer typed beforehand.
+  const debateId = debate?.id;
+  useEffect(() => {
+    if (status !== "authenticated" || !debateId) return;
+    try {
+      const raw = window.localStorage.getItem(DRAFT_KEY);
+      if (!raw) return;
+      window.localStorage.removeItem(DRAFT_KEY);
+      const draft = JSON.parse(raw) as { debateId?: string; content?: string };
+      if (draft.debateId === debateId && typeof draft.content === "string") {
+        setEntryContent(draft.content.slice(0, 280));
+        setDraftRestored(true);
+      }
+    } catch {
+      // no usable draft
+    }
+  }, [status, debateId]);
 
   // Loading state while auth is being checked
   const isLoading = status === "loading";
@@ -51,7 +75,7 @@ export function DebateView({ initialDebate }: DebateViewProps) {
   // Handle entry submission
   const handleSubmitEntry = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!session || !debate || isSubmitting) return;
+    if (!debate || isSubmitting || isLoading) return;
 
     const content = entryContent.trim();
     if (!content) {
@@ -64,8 +88,24 @@ export function DebateView({ initialDebate }: DebateViewProps) {
       return;
     }
 
+    // Not signed in: keep the answer, sign in, then come back to post it.
+    if (!session) {
+      try {
+        window.localStorage.setItem(
+          DRAFT_KEY,
+          JSON.stringify({ debateId: debate.id, content })
+        );
+      } catch {
+        // storage unavailable; they will have to retype after signing in
+      }
+      const back = encodeURIComponent(window.location.pathname);
+      window.location.href = `/auth/signin?reason=submit&callbackUrl=${back}`;
+      return;
+    }
+
     setIsSubmitting(true);
     setSubmitError(null);
+    setDraftRestored(false);
 
     try {
       const response = await fetch("/api/entries", {
@@ -111,7 +151,8 @@ export function DebateView({ initialDebate }: DebateViewProps) {
   // Handle voting with optimistic UI update
   // One vote per debate - voting on a new entry removes vote from previous
   const handleVote = async (entry: Entry) => {
-    if (!session || !debate) return;
+    if (!debate) return;
+    setVoteError(null);
 
     const wasVoted = entry.hasVoted;
     const originalVoteCount = entry.voteCount;
@@ -150,30 +191,8 @@ export function DebateView({ initialDebate }: DebateViewProps) {
     });
 
     try {
-      let response: Response;
-
-      if (wasVoted) {
-        // Remove vote
-        response = await fetch(`/api/votes/${entry.id}`, {
-          method: "DELETE",
-        });
-      } else {
-        // Add vote (server will handle removing previous vote)
-        response = await fetch("/api/votes", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({ entryId: entry.id }),
-        });
-      }
-
-      if (!response.ok) {
-        // Revert on error
-        throw new Error("Vote failed");
-      }
-
-      const data = await response.json();
+      // The server moves the vote if this voter already voted elsewhere.
+      const data = await sendVote(entry.id, wasVoted);
 
       // Update with server response to ensure accuracy
       startTransition(() => {
@@ -188,8 +207,10 @@ export function DebateView({ initialDebate }: DebateViewProps) {
                   hasVoted: data.hasVoted,
                   voteCount: data.voteCount,
                 };
-              } else if (data.previousEntryId && e.id === data.previousEntryId) {
-                // Update the entry that lost the vote
+              } else if (data.previousEntryId && e.id === data.previousEntryId && e.hasVoted) {
+                // The server moved a vote we did not know about (cast in
+                // another tab). If we knew, the optimistic update above
+                // already took it off, so it must not be subtracted twice.
                 return {
                   ...e,
                   hasVoted: false,
@@ -201,7 +222,8 @@ export function DebateView({ initialDebate }: DebateViewProps) {
           };
         });
       });
-    } catch {
+    } catch (error) {
+      setVoteError(error instanceof Error ? error.message : "Vote failed");
       // Revert optimistic update on error
       startTransition(() => {
         setDebate((prev) => {
@@ -288,7 +310,7 @@ export function DebateView({ initialDebate }: DebateViewProps) {
       )}
 
       {/* Hero Section */}
-      <div className="text-center mb-12">
+      <div className="text-center mb-8">
         <div className="inline-block bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 px-4 py-1 rounded-full text-sm font-medium mb-4">
           {debateLabel(debate.season, debate.dayNumber)} of {SEASON_LENGTH}
         </div>
@@ -298,60 +320,48 @@ export function DebateView({ initialDebate }: DebateViewProps) {
         </h1>
       </div>
 
-      {/* Entry Submission */}
-      {isLoading ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
-          <div className="animate-pulse">
-            <div className="h-6 bg-gray-200 rounded w-1/4 mb-4"></div>
-            <div className="h-12 bg-gray-200 rounded w-full"></div>
-          </div>
-        </div>
-      ) : session ? (
-        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
-          <h2 className="text-lg font-semibold text-gray-800 mb-4">
-            Submit Your Answer
-          </h2>
-          <form onSubmit={handleSubmitEntry} className="flex flex-col sm:flex-row gap-3 sm:gap-4">
-            <input
-              type="text"
-              value={entryContent}
-              onChange={(e) => {
-                setEntryContent(e.target.value);
-                setSubmitError(null);
-              }}
-              placeholder="Type your silly answer..."
-              maxLength={280}
-              className="flex-1 min-w-0 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
-              disabled={isSubmitting}
-            />
-            <button
-              type="submit"
-              disabled={isSubmitting || !entryContent.trim()}
-              className="bg-gradient-to-r from-purple-600 to-pink-500 text-white px-6 py-3 rounded-xl font-medium hover:opacity-90 transition-opacity whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              {isSubmitting ? "Submitting..." : "Submit"}
-            </button>
-          </form>
-          {submitError && (
-            <p className="text-sm text-red-500 mt-2">{submitError}</p>
-          )}
-          <p className="text-sm text-gray-500 mt-2">
-            {280 - entryContent.length} characters remaining. Submit as many answers as you like!
-          </p>
-        </div>
-      ) : (
-        <div className="bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl p-6 mb-8 text-center">
-          <p className="text-gray-700 mb-4">
-            Sign in to submit your answer and vote!
-          </p>
-          <Link
-            href="/auth/signin"
-            className="inline-block bg-gradient-to-r from-purple-600 to-pink-500 text-white px-6 py-3 rounded-xl font-medium hover:opacity-90 transition-opacity"
+      {/* Entry Submission: anyone can type; posting asks for sign-in */}
+      <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-8">
+        <h2 className="text-lg font-semibold text-gray-800 mb-4">
+          Submit Your Answer
+        </h2>
+        <form onSubmit={handleSubmitEntry} className="flex flex-col sm:flex-row gap-3 sm:gap-4">
+          <input
+            type="text"
+            value={entryContent}
+            onChange={(e) => {
+              setEntryContent(e.target.value);
+              setSubmitError(null);
+            }}
+            placeholder="Type your silly answer..."
+            aria-label="Your answer"
+            maxLength={280}
+            className="flex-1 min-w-0 px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+            disabled={isSubmitting}
+          />
+          <button
+            type="submit"
+            disabled={isSubmitting || isLoading || !entryContent.trim()}
+            className="bg-gradient-to-r from-purple-600 to-pink-500 text-white px-6 py-3 rounded-xl font-medium hover:opacity-90 transition-opacity whitespace-nowrap disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            Sign In to Participate
-          </Link>
-        </div>
-      )}
+            {isSubmitting ? "Submitting..." : "Submit"}
+          </button>
+        </form>
+        {submitError && (
+          <p className="text-sm text-red-500 mt-2">{submitError}</p>
+        )}
+        {draftRestored && (
+          <p className="text-sm text-purple-700 mt-2">
+            Welcome back. Your answer is ready: press Submit to post it.
+          </p>
+        )}
+        <p className="text-sm text-gray-500 mt-2">
+          {280 - entryContent.length} characters remaining.{" "}
+          {session || isLoading
+            ? "Submit as many answers as you like!"
+            : "You'll sign in to post it; your answer is saved while you do."}
+        </p>
+      </div>
 
       {/* Entries List */}
       <div className="space-y-4">
@@ -369,6 +379,12 @@ export function DebateView({ initialDebate }: DebateViewProps) {
             <option value="oldest">Oldest</option>
           </select>
         </div>
+
+        {voteError && (
+          <p role="alert" className="text-sm text-red-600 bg-red-50 border border-red-100 rounded-lg px-4 py-2">
+            {voteError}
+          </p>
+        )}
 
         {sortedEntries.length === 0 ? (
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-8 text-center">
@@ -409,21 +425,13 @@ export function DebateView({ initialDebate }: DebateViewProps) {
                       <>
                         <button
                           onClick={() => handleVote(entry)}
-                          disabled={!session || isPending}
+                          disabled={isPending}
                           className={`flex items-center gap-2 px-4 py-2 rounded-full font-medium text-sm transition-all ${
-                            session
-                              ? entry.hasVoted
-                                ? "bg-purple-600 text-white hover:bg-purple-700"
-                                : "bg-gray-100 text-gray-700 hover:bg-purple-100 hover:text-purple-600 border border-gray-200 hover:border-purple-300"
-                              : "bg-gray-100 text-gray-400 cursor-not-allowed"
+                            entry.hasVoted
+                              ? "bg-purple-600 text-white hover:bg-purple-700"
+                              : "bg-gray-100 text-gray-700 hover:bg-purple-100 hover:text-purple-600 border border-gray-200 hover:border-purple-300"
                           }`}
-                          title={
-                            session
-                              ? entry.hasVoted
-                                ? "Click to remove vote"
-                                : "Click to vote"
-                              : "Sign in to vote"
-                          }
+                          title={entry.hasVoted ? "Click to remove vote" : "Click to vote"}
                         >
                           {entry.hasVoted ? (
                             <>

@@ -94,8 +94,9 @@ export function renderCard(
             style={{
               display: "flex",
               flexDirection: "column",
-              flex: story ? 1 : undefined,
-              justifyContent: story ? "center" : "flex-start",
+              // In the tall story layout the text block fills the card and is
+              // centred. (Satori rejects `flex: undefined`, hence the spread.)
+              ...(story ? { flex: 1, justifyContent: "center" } : {}),
             }}
           >
             {answer && (

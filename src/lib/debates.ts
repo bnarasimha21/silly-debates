@@ -12,6 +12,7 @@ const userSelect = { id: true, name: true, image: true } as const;
 /** Prisma filter matching votes cast by this viewer. Null when there is no identity. */
 export function viewerVoteFilter(viewer: Viewer) {
   if (viewer.userId) return { userId: viewer.userId };
+  if (viewer.visitorId) return { visitorId: viewer.visitorId };
   return null;
 }
 

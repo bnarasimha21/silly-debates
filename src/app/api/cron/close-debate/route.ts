@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateWinnerCommentary } from "@/lib/ai";
+import { pickWinner } from "@/lib/winner";
 import {
   uploadDebateToSpaces,
   uploadDebateAsTextToSpaces,
@@ -41,22 +42,6 @@ export async function POST(request: NextRequest) {
     // Find the active debate
     const activeDebate = await prisma.debate.findFirst({
       where: { status: "ACTIVE" },
-      include: {
-        entries: {
-          where: { approved: true },
-          // Ties go to the entry that was submitted first.
-          orderBy: [{ voteCount: "desc" }, { createdAt: "asc" }],
-          take: 1,
-          include: {
-            user: {
-              select: {
-                id: true,
-                name: true,
-              },
-            },
-          },
-        },
-      },
     });
 
     if (!activeDebate) {
@@ -66,8 +51,8 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Determine the winner
-    const winningEntry = activeDebate.entries[0];
+    // Determine the winner (see pickWinner for the tie-break rules)
+    const winningEntry = await pickWinner(activeDebate.id);
 
     let winnerCommentary: string | null = null;
 

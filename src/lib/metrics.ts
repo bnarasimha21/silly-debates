@@ -1,4 +1,5 @@
 import { prisma } from "./prisma";
+import { debateLabel } from "./site";
 
 /**
  * Growth metrics computed from the Event table. Days are UTC calendar days.
@@ -23,7 +24,18 @@ export interface Funnel {
   shared: number;
 }
 
+export interface DebateVoteSplit {
+  id: string;
+  label: string;
+  topic: string;
+  signedIn: number;
+  anonymous: number;
+  /** Distinct network addresses behind the anonymous votes. */
+  networks: number;
+}
+
 export interface Metrics {
+  voteSplit: DebateVoteSplit[];
   days: DailyRow[];
   funnel: Funnel;
   activeActors: number;
@@ -117,9 +129,31 @@ export async function getMetrics(windowDays = 14): Promise<Metrics> {
   const base = completed.reduce((sum, d) => sum + d.visitors, 0);
   const returned = completed.reduce((sum, d) => sum + (d.returnedNextDay ?? 0), 0);
 
+  const splitRows = await prisma.$queryRaw<Raw[]>`
+    SELECT d.id, d.season, d."dayNumber" AS day, d.topic,
+      COUNT(v.id) FILTER (WHERE v."userId" IS NOT NULL) AS signed_in,
+      COUNT(v.id) FILTER (WHERE v."userId" IS NULL) AS anonymous,
+      COUNT(DISTINCT v."ipHash") FILTER (WHERE v."userId" IS NULL) AS networks
+    FROM "Debate" d
+    LEFT JOIN "Entry" e ON e."debateId" = d.id
+    LEFT JOIN "Vote" v ON v."entryId" = e.id
+    GROUP BY d.id
+    ORDER BY d."createdAt" DESC
+    LIMIT 10
+  `;
+  const voteSplit: DebateVoteSplit[] = splitRows.map((row) => ({
+    id: String(row.id),
+    label: debateLabel(num(row.season), num(row.day)),
+    topic: String(row.topic),
+    signedIn: num(row.signed_in),
+    anonymous: num(row.anonymous),
+    networks: num(row.networks),
+  }));
+
   const totalEvents = await prisma.event.count();
 
   return {
+    voteSplit,
     days,
     funnel,
     activeActors,

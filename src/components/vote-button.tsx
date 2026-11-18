@@ -1,8 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { useSession } from "next-auth/react";
+import { sendVote } from "@/lib/vote-client";
 
 interface VoteButtonProps {
   entryId: string;
@@ -10,9 +9,8 @@ interface VoteButtonProps {
   initialHasVoted: boolean;
 }
 
-/** Large vote button for the single-entry page. */
+/** Large vote button for the single-entry page. No sign-in needed. */
 export function VoteButton({ entryId, initialVoteCount, initialHasVoted }: VoteButtonProps) {
-  const { data: session, status } = useSession();
   const [voteCount, setVoteCount] = useState(initialVoteCount);
   const [hasVoted, setHasVoted] = useState(initialHasVoted);
   const [busy, setBusy] = useState(false);
@@ -27,15 +25,7 @@ export function VoteButton({ entryId, initialVoteCount, initialHasVoted }: VoteB
     setVoteCount(voteCount + (hasVoted ? -1 : 1));
 
     try {
-      const response = hasVoted
-        ? await fetch(`/api/votes/${entryId}`, { method: "DELETE" })
-        : await fetch("/api/votes", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ entryId }),
-          });
-      const data = await response.json();
-      if (!response.ok) throw new Error(data.error || "Vote failed");
+      const data = await sendVote(entryId, hasVoted);
       setHasVoted(data.hasVoted);
       setVoteCount(data.voteCount);
     } catch (err) {
@@ -49,26 +39,12 @@ export function VoteButton({ entryId, initialVoteCount, initialHasVoted }: VoteB
 
   const countLabel = `${voteCount} ${voteCount === 1 ? "vote" : "votes"}`;
 
-  if (status !== "loading" && !session) {
-    return (
-      <div className="text-center">
-        <Link
-          href="/auth/signin"
-          className="block w-full bg-gradient-to-r from-purple-600 to-pink-500 text-white px-6 py-4 rounded-xl font-semibold text-lg hover:opacity-90 transition-opacity"
-        >
-          Sign in to vote
-        </Link>
-        <p className="text-sm text-gray-500 mt-2">{countLabel} so far</p>
-      </div>
-    );
-  }
-
   return (
     <div className="text-center">
       <button
         type="button"
         onClick={toggle}
-        disabled={busy || status === "loading"}
+        disabled={busy}
         className={`w-full px-6 py-4 rounded-xl font-semibold text-lg transition-all disabled:opacity-60 ${
           hasVoted
             ? "bg-purple-100 text-purple-700 border-2 border-purple-300 hover:bg-purple-200"

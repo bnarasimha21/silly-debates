@@ -130,12 +130,18 @@ model Vote {
   entryId String
   entry   Entry  @relation(fields: [entryId], references: [id], onDelete: Cascade)
 
-  userId String
-  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  // A vote belongs to a signed-in user or to an anonymous visitor, never both.
+  userId String?
+  user   User?   @relation(fields: [userId], references: [id], onDelete: Cascade)
 
-  // One vote per user per entry
+  visitorId String? // anonymous visitor cookie id
+  ipHash    String? // salted hash of the voter's IP, anonymous votes only
+
+  // One vote per voter per entry
   @@unique([entryId, userId])
+  @@unique([entryId, visitorId])
   @@index([entryId])
+  @@index([visitorId])
 }
 
 // ============================================

@@ -15,7 +15,16 @@ Two numbers define success. Everything in this spec exists to move one of them.
 The thresholds in the phase gates below are starting proposals, not industry
 benchmarks. Adjust them once Phase 0 gives real baselines.
 
-## 2. Current state (from the code)
+## Status
+
+| Phase | State |
+|-------|-------|
+| 0 - Foundations and measurement | Built |
+| 1 - Share loop | Built |
+| 2 - Remove friction | Built (email sign-in needs a Resend key to switch on) |
+| 3 to 6 | Not started; each waits for the gate before it |
+
+## 2. State before this work (from the code)
 
 | Area | Finding | Where |
 |------|---------|-------|
@@ -133,13 +142,19 @@ the card, and a share-to-vote path is visible in `/admin/metrics`.
 ## Phase 2 - Remove friction
 
 ### 2.1 Anonymous voting
-- `Vote.userId` becomes nullable; add `Vote.visitorId`. Uniqueness becomes one
-  vote per entry per voter key (user id if signed in, else visitor id).
-- `POST /api/votes` accepts either a session or the visitor cookie.
-- Abuse limits: cap anonymous votes per debate per hashed IP (start at 5),
-  basic bot user-agent filter, votes from cookies less than 3 seconds old
-  rejected. Store only a salted hash of the IP.
-- On sign-in, the visitor's votes are attached to the user; duplicates dropped.
+- `Vote.userId` becomes nullable; add `Vote.visitorId` and `Vote.ipHash`. A
+  vote belongs to a user or to a visitor, never both.
+- `POST /api/votes` and `DELETE /api/votes/[entryId]` accept either a session
+  or the visitor cookie.
+- Anonymous votes count fully towards the winner. Among entries tied on
+  votes, the one with more signed-in votes wins, then the earliest.
+- Abuse limits: at most `ANON_VOTERS_PER_IP` (default 10) anonymous voters per
+  debate per network address, and a bot user-agent filter. Only a salted hash
+  of the IP is stored. The default is 10 rather than 5 because mobile carriers
+  put many real people behind one address.
+- On sign-in, the visitor's votes are attached to the user. A vote is dropped
+  instead if it is for the user's own entry or the user already voted in that
+  debate.
 - Admin metrics show the anonymous vs signed-in vote split per debate so
   stuffing is visible.
 
@@ -148,11 +163,13 @@ the card, and a share-to-vote path is visible in `/admin/metrics`.
   notifications).
 - Let visitors type their answer first, then ask them to sign in to post it.
   The draft is kept in `localStorage` across the OAuth round trip.
-- Add email magic-link sign-in. Order providers: Google, email, GitHub.
+- Email magic-link sign-in through Resend, shown only when `AUTH_RESEND_KEY`
+  and `EMAIL_FROM` are set. Provider order: Google, email, GitHub.
 
 ### 2.3 Landing
 - First screen is today's topic and something to vote on. No explainer above it.
-- Visitors arriving at `/e/[id]` see that entry first, not the home page.
+- Visitors arriving at `/e/[id]` see that entry first, not the home page, and
+  can vote on it in one tap.
 
 **Gate:** 40% of new visitors cast at least one vote.
 
@@ -241,7 +258,7 @@ the card, and a share-to-vote path is visible in `/admin/metrics`.
 | Phase | Change |
 |-------|--------|
 | 0 | New `Event`; `Debate.season`; `@@unique([season, dayNumber])` |
-| 2 | `Vote.userId` nullable; `Vote.visitorId`; new uniqueness on voter key |
+| 2 | `Vote.userId` nullable; `Vote.visitorId`, `Vote.ipHash`; `@@unique([entryId, visitorId])` |
 | 3 | `User.isBot`; new `PairVote` |
 | 4 | `User` streak fields; new `NotificationPref`, `PushSubscription` |
 | 5 | New `League`, `LeagueMember`; `Entry.leagueId` |
@@ -250,16 +267,18 @@ the card, and a share-to-vote path is visible in `/admin/metrics`.
 
 | Risk | Mitigation |
 |------|------------|
-| Anonymous vote stuffing decides winners | IP-hash caps, visible anon/signed split, option to weight or exclude anon votes from winner selection |
+| Anonymous vote stuffing decides winners | Per-network cap, signed-in votes break ties, anonymous/signed-in split shown per debate in `/admin/metrics` |
 | Bot answers feel fake | Always labelled; never win; stop once humans fill the room |
 | Share cards spread a bad answer | Only moderated entries get a card; add a report link on `/e/[id]` |
 | Notification fatigue | One a day maximum, per-type opt-out |
 | Core loop is not fun enough | See section 7 - the gates are designed to reveal this early |
 
-## 7. Open decisions
+## 7. Decisions
 
-1. Product name and domain.
-2. Do anonymous votes count fully towards the winner, or at reduced weight?
-3. Does head-to-head replace list voting, or sit beside it?
-4. Email provider.
-5. Closing time: currently about 14:00 UTC. Which audience timezone is primary?
+| Question | Decision |
+|----------|----------|
+| Product name and domain | Open. Owner is buying a domain. |
+| Do anonymous votes count towards the winner? | Yes, fully, with the per-network limit. Ties go to the entry with more signed-in votes. Revisit if `/admin/metrics` shows stuffing. |
+| Head-to-head vs list voting | Head-to-head ships beside list voting behind a flag (Phase 3) and becomes the default only if it wins on votes per visitor. |
+| Email provider | Resend. |
+| Closing time | Unchanged: about 14:00 UTC (evening in India, morning in the US). |

@@ -6,7 +6,10 @@ A fun, month-long daily debate game where users submit creative entries, vote on
 
 - **Daily Debates**: New silly debate topics generated each day by AI
 - **User Entries**: Submit your funniest/most creative answers (as many as you like)
-- **Voting**: Vote for your favorite entries
+- **Voting**: Vote for your favorite entries, no sign-in needed
+- **Sharing**: Every debate and entry has its own page and preview image, with share buttons for WhatsApp, X and the native share sheet
+- **Seasons**: 30 debates per season; a new season starts automatically
+- **Growth metrics**: `/admin/metrics` shows the visit-to-vote-to-share funnel, invite rate and next-day return
 - **AI-Powered**:
   - Topic generation using DigitalOcean Serverless Inference
   - Content moderation for submissions
@@ -85,6 +88,9 @@ See `.env.example` for all required variables:
 - `SPACES_KEY/SECRET` - DigitalOcean Spaces credentials
 - `GRADIENT_KB_UUID` - Knowledge Base UUID
 - `DO_API_TOKEN` - DigitalOcean API token (GenAI:read scope)
+- `ADMIN_EMAILS` - Comma-separated emails allowed to open `/admin/metrics`
+- `AUTH_RESEND_KEY`, `EMAIL_FROM` - Optional. Set both to offer email sign-in links
+- `ANON_VOTERS_PER_IP` - Optional. Anonymous voters allowed per debate per network address (default 10)
 - `CRON_SECRET` - Secret for cron job authentication. Required: the `/api/cron/*` POST routes return 401 if it is unset.
 
 ## API Endpoints
@@ -92,15 +98,26 @@ See `.env.example` for all required variables:
 ### Public
 - `GET /api/debates/today` - Get today's active debate
 - `POST /api/chat` - Chat with AI about debate history
+- `POST /api/votes` - Vote for an entry (signed-in, or anonymous via the visitor cookie)
+- `DELETE /api/votes/[entryId]` - Remove your vote
+- `POST /api/events` - Record a page view or share click; sets the visitor cookie
 
 ### Authenticated
 - `POST /api/entries` - Submit an entry
-- `POST /api/votes` - Vote for an entry
-- `DELETE /api/votes` - Remove a vote
+
+### Pages
+- `/d/[id]` - A debate (live voting while open, results once closed)
+- `/e/[id]` - A single entry, built for sharing
+- `/e/[id]/story.png` - 1080x1920 image of an entry for stories
+- `/admin/metrics` - Growth metrics (emails listed in `ADMIN_EMAILS` only)
 
 ### Cron (requires CRON_SECRET)
 - `POST /api/cron/new-debate` - Generate new daily debate
 - `POST /api/cron/close-debate` - Close debate and announce winner
+
+## Growth plan
+
+See [GROWTH_SPEC.md](GROWTH_SPEC.md) for the phased growth plan, what has been built, and the gate each phase must pass before the next one starts.
 
 ## Project Structure
 

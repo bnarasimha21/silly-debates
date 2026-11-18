@@ -1,5 +1,25 @@
 # Deployment Checklist
 
+## Growth release (Phases 0-2 of GROWTH_SPEC.md)
+
+Do these in order. The app build does not run migrations.
+
+- [ ] Apply database migrations **before** deploying the new code:
+      `DATABASE_URL=<production url> npx prisma migrate deploy`
+      (adds `Debate.season`, the `Event` table, and anonymous-vote columns on
+      `Vote`; the currently deployed code keeps working on the new schema)
+- [ ] Set `ADMIN_EMAILS` to your sign-in email so you can open `/admin/metrics`
+- [ ] After the custom domain is live: set `APP_URL` / `NEXTAUTH_URL` to it,
+      update `APP_URL` in `functions/project.yml`, and update the OAuth
+      callback URLs below. Share links and preview images use this URL.
+- [ ] Optional: set `AUTH_RESEND_KEY` and `EMAIL_FROM` to offer email sign-in
+- [ ] After deploy, vote once without signing in, then check `/admin/metrics`:
+      "Networks" for today's debate should be 1 or more. If it stays 0 the
+      platform is not passing the visitor's IP and the per-network vote limit
+      is not being applied (see `requestIpHash` in `src/lib/voter.ts`).
+- [ ] Paste an entry link (`/e/...`) into WhatsApp, X and Slack and confirm
+      the preview card appears
+
 ## Before Deploying to DigitalOcean App Platform
 
 - [ ] Set environment variables in App Platform:
