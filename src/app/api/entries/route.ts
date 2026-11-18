@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { moderateContent } from "@/lib/ai";
+import { track } from "@/lib/track";
+import { getVisitorId } from "@/lib/visitor";
 
 /**
  * POST /api/entries
@@ -78,7 +80,10 @@ export async function POST(request: NextRequest) {
     // Moderate the content using AI
     const moderationResult = await moderateContent(trimmedContent, debate.topic);
 
+    const visitorId = await getVisitorId();
+
     if (!moderationResult.approved) {
+      await track("entry_rejected", { visitorId, userId, debateId: debate.id });
       return NextResponse.json(
         {
           error: "Entry was not approved by moderation",
@@ -105,6 +110,13 @@ export async function POST(request: NextRequest) {
           },
         },
       },
+    });
+
+    await track("entry_submit", {
+      visitorId,
+      userId,
+      debateId: debate.id,
+      entryId: entry.id,
     });
 
     return NextResponse.json(

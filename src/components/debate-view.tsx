@@ -5,6 +5,7 @@ import { useSession } from "next-auth/react";
 import Link from "next/link";
 import Image from "next/image";
 import type { Debate, Entry, VoteResponse, EntryResponse } from "@/types";
+import { debateLabel, SEASON_LENGTH } from "@/lib/site";
 
 interface DebateViewProps {
   initialDebate: Debate | null;
@@ -248,7 +249,7 @@ export function DebateView({ initialDebate }: DebateViewProps) {
       {/* Hero Section */}
       <div className="text-center mb-12">
         <div className="inline-block bg-gradient-to-r from-purple-100 to-pink-100 text-purple-700 px-4 py-1 rounded-full text-sm font-medium mb-4">
-          Day {debate.dayNumber} of 30
+          {debateLabel(debate.season, debate.dayNumber)} of {SEASON_LENGTH}
         </div>
         <p className="text-lg text-gray-500 mb-4">Today&apos;s Silly Debate</p>
         <h1 className="bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent text-4xl md:text-5xl font-bold max-w-2xl mx-auto">

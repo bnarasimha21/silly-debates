@@ -5,7 +5,7 @@ A fun, month-long daily debate game where users submit creative entries, vote on
 ## Features
 
 - **Daily Debates**: New silly debate topics generated each day by AI
-- **User Entries**: Submit your funniest/most creative answers (one per debate)
+- **User Entries**: Submit your funniest/most creative answers (as many as you like)
 - **Voting**: Vote for your favorite entries
 - **AI-Powered**:
   - Topic generation using DigitalOcean Serverless Inference

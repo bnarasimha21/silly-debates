@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { track } from "@/lib/track";
+import { getVisitorId } from "@/lib/visitor";
 
 interface RouteParams {
   params: Promise<{
@@ -91,6 +93,13 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
         },
       }),
     ]);
+
+    await track("vote_removed", {
+      visitorId: await getVisitorId(),
+      userId,
+      debateId: entry.debateId,
+      entryId,
+    });
 
     return NextResponse.json({
       entryId: updatedEntry.id,

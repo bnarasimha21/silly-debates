@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import Image from "next/image";
+import { debateLabel } from "@/lib/site";
 
 // Force dynamic rendering to always fetch fresh data
 export const dynamic = "force-dynamic";
@@ -56,6 +57,7 @@ async function getLatestResult() {
 
   return {
     topic: debate.topic,
+    season: debate.season,
     dayNumber: debate.dayNumber,
     entry: debate.winningEntry.content,
     user: {
@@ -100,7 +102,7 @@ export default async function ResultsPage() {
         <h1 className="text-3xl font-bold text-gray-900 mb-2">
           Latest Winner
         </h1>
-        <p className="text-gray-600">Day {winner.dayNumber} Results</p>
+        <p className="text-gray-600">{debateLabel(winner.season, winner.dayNumber)} Results</p>
       </div>
 
       {/* Winner Card */}

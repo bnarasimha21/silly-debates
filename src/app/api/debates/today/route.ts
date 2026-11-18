@@ -41,9 +41,7 @@ export async function GET() {
                 }
               : false,
           },
-          orderBy: {
-            voteCount: "desc",
-          },
+          orderBy: [{ voteCount: "desc" }, { createdAt: "asc" }],
         },
       },
     });
@@ -74,6 +72,7 @@ export async function GET() {
     return NextResponse.json({
       id: debate.id,
       topic: debate.topic,
+      season: debate.season,
       dayNumber: debate.dayNumber,
       status: debate.status,
       createdAt: debate.createdAt,

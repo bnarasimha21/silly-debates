@@ -44,7 +44,8 @@ export async function POST(request: NextRequest) {
       include: {
         entries: {
           where: { approved: true },
-          orderBy: { voteCount: "desc" },
+          // Ties go to the entry that was submitted first.
+          orderBy: [{ voteCount: "desc" }, { createdAt: "asc" }],
           take: 1,
           include: {
             user: {
@@ -134,7 +135,7 @@ export async function POST(request: NextRequest) {
         // Get top entries for KB
         const topEntries = await prisma.entry.findMany({
           where: { debateId: activeDebate.id, approved: true },
-          orderBy: { voteCount: "desc" },
+          orderBy: [{ voteCount: "desc" }, { createdAt: "asc" }],
           take: 5,
           include: {
             user: { select: { name: true } },
@@ -145,6 +146,7 @@ export async function POST(request: NextRequest) {
 
         const debateKBData: DebateKBData = {
           id: closedDebate.id,
+          season: closedDebate.season,
           dayNumber: closedDebate.dayNumber,
           date: closedDebate.closedAt?.toISOString().split("T")[0] || new Date().toISOString().split("T")[0],
           topic: closedDebate.topic,
@@ -190,6 +192,7 @@ export async function POST(request: NextRequest) {
       debate: {
         id: closedDebate.id,
         topic: closedDebate.topic,
+        season: closedDebate.season,
         dayNumber: closedDebate.dayNumber,
         closedAt: closedDebate.closedAt,
         totalEntries: closedDebate._count.entries,
@@ -225,7 +228,7 @@ export async function GET() {
       include: {
         entries: {
           where: { approved: true },
-          orderBy: { voteCount: "desc" },
+          orderBy: [{ voteCount: "desc" }, { createdAt: "asc" }],
           take: 5,
           include: {
             user: {

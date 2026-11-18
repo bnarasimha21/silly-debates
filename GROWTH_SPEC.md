@@ -25,7 +25,7 @@ benchmarks. Adjust them once Phase 0 gives real baselines.
 | Retention | No email, push, streaks or win notifications | - |
 | Analytics | None | - |
 | Winner | Highest `voteCount`, ties broken arbitrarily | `src/app/api/cron/close-debate/route.ts` |
-| Entry limit | README says one entry per debate; the API allows many | `src/app/api/entries/route.ts` |
+| Entry limit | README said one entry per debate; many are allowed by design | `src/app/api/entries/route.ts` |
 | Domain | Served from `silly-debates-6vhp9.ondigitalocean.app` | `functions/project.yml` |
 | Live debate URL | Only closed debates have a page (`/history/[id]`) | `src/app/history/[id]/page.tsx` |
 
@@ -64,28 +64,32 @@ one community post) and read the funnel from that batch.
 ### 0.1 Event tracking
 - Add an `Event` table: `id`, `name`, `visitorId`, `userId?`, `debateId?`,
   `entryId?`, `ref?`, `props Json?`, `createdAt`.
-- `visitorId` comes from a signed, httpOnly, one-year cookie set by middleware
-  on first visit. This cookie is reused for anonymous voting in Phase 2.
+- `visitorId` comes from a signed, httpOnly, one-year cookie set by
+  `POST /api/events` on the first page view (no middleware needed, and
+  crawlers that do not run JavaScript are not counted). This cookie is reused
+  for anonymous voting in Phase 2.
 - Add `src/lib/track.ts` with a server-side `track(name, ctx)` helper and a
   `POST /api/events` route for client events.
-- Events: `visit`, `vote`, `entry_submit`, `entry_rejected`, `share_click`,
-  `share_landing`, `signin_start`, `signin_done`, `pair_vote`, `notif_open`.
+- Events: `visit`, `vote`, `vote_removed`, `entry_submit`, `entry_rejected`,
+  `share_click`, `share_landing`, `signin_start`, `signin_done`. Later phases
+  add `pair_vote` and `notif_open`.
 - Shared links carry `?ref=<visitorId-short>&src=<channel>` so invites can be
   attributed.
-- Add a protected `/admin/metrics` page showing daily visitors, funnel
+- Add a `/admin/metrics` page, visible only to emails in `ADMIN_EMAILS`, showing daily visitors, funnel
   (visit to vote to submit to share), invite rate and next-day return.
 
 ### 0.2 Seasons instead of a 30-day end
-- Add `Season` (`id`, `number`, `startsAt`, `endsAt`).
-- Replace `Debate.dayNumber @unique` with `@@unique([seasonId, dayNumber])`.
+- Add `Debate.season` (integer, default 1). A separate `Season` table is not
+  needed: a season's dates follow from its debates.
+- Replace `Debate.dayNumber @unique` with `@@unique([season, dayNumber])`.
 - `new-debate` cron rolls into a new season after day 30 instead of returning
   an error. Leaderboard gains "this season" and "all time" views.
-- Migrate existing debates into Season 1.
+- Existing debates become Season 1 through the column default.
 
 ### 0.3 Correctness fixes that growth will expose
-- Tie-break: earliest entry wins among equal vote counts; store it explicitly.
-- Enforce one entry per user per debate (`@@unique([debateId, userId])`), to
-  match the README and stop vote-splitting.
+- Tie-break: earliest entry wins among equal vote counts.
+- Multiple entries per user stay allowed. That was a deliberate change
+  (migration `allow_multiple_entries`); the README was out of date and is fixed.
 - Custom domain, with `NEXTAUTH_URL` and `APP_URL` updated. Short and sayable.
 - Add `metadataBase` in `src/app/layout.tsx` so OG URLs resolve.
 
@@ -236,7 +240,7 @@ the card, and a share-to-vote path is visible in `/admin/metrics`.
 
 | Phase | Change |
 |-------|--------|
-| 0 | New `Event`, `Season`; `Debate.seasonId`; `@@unique([seasonId, dayNumber])`; `Entry @@unique([debateId, userId])` |
+| 0 | New `Event`; `Debate.season`; `@@unique([season, dayNumber])` |
 | 2 | `Vote.userId` nullable; `Vote.visitorId`; new uniqueness on voter key |
 | 3 | `User.isBot`; new `PairVote` |
 | 4 | `User` streak fields; new `NotificationPref`, `PushSubscription` |

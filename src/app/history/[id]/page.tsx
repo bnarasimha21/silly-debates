@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { prisma } from "@/lib/prisma";
+import { debateLabel } from "@/lib/site";
 
 interface DebateEntry {
   id: string;
@@ -15,6 +16,7 @@ interface DebateEntry {
 
 interface DebateDetails {
   id: string;
+  season: number;
   dayNumber: number;
   topic: string;
   closedAt: Date | null;
@@ -57,6 +59,7 @@ async function getDebateDetails(id: string): Promise<DebateDetails | null> {
 
   return {
     id: debate.id,
+    season: debate.season,
     dayNumber: debate.dayNumber,
     topic: debate.topic,
     closedAt: debate.closedAt,
@@ -114,7 +117,7 @@ export default async function DebateDetailPage({
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 mb-6">
         <div className="flex items-center gap-2 mb-3">
           <span className="bg-purple-100 text-purple-700 text-sm font-medium px-3 py-1 rounded-full">
-            Day {debate.dayNumber}
+            {debateLabel(debate.season, debate.dayNumber)}
           </span>
           {debate.closedAt && (
             <span className="text-gray-500 text-sm">

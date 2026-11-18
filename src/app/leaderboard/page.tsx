@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import Image from "next/image";
+import Link from "next/link";
 
 // Force dynamic rendering to always fetch fresh data
 export const dynamic = "force-dynamic";
@@ -12,36 +13,55 @@ interface LeaderboardUser {
   totalVotes: number;
 }
 
+type Scope = "season" | "all";
+
 /**
- * Fetch users ranked by winsCount with their total votes received
+ * Fetch winners with their total votes received.
+ * "all" ranks by all-time wins; "season" counts wins in the current season only.
  */
-async function getLeaderboard(): Promise<LeaderboardUser[]> {
-  // Get users with at least 1 win, ordered by wins
-  const usersWithWins = await prisma.user.findMany({
-    where: {
-      winsCount: {
-        gt: 0,
+async function getLeaderboard(scope: Scope, season: number): Promise<LeaderboardUser[]> {
+  let winners: { id: string; name: string | null; image: string | null; wins: number }[];
+
+  if (scope === "all") {
+    const users = await prisma.user.findMany({
+      where: { winsCount: { gt: 0 } },
+      orderBy: [
+        { winsCount: "desc" },
+        { createdAt: "asc" }, // Tiebreaker: earlier users first
+      ],
+      select: { id: true, name: true, image: true, winsCount: true },
+    });
+    winners = users.map((u) => ({ id: u.id, name: u.name, image: u.image, wins: u.winsCount }));
+  } else {
+    const won = await prisma.debate.findMany({
+      where: { season, status: "CLOSED", winningEntryId: { not: null } },
+      select: {
+        winningEntry: {
+          select: { user: { select: { id: true, name: true, image: true, createdAt: true } } },
+        },
       },
-    },
-    orderBy: [
-      { winsCount: "desc" },
-      { createdAt: "asc" }, // Tiebreaker: earlier users first
-    ],
-    select: {
-      id: true,
-      name: true,
-      image: true,
-      winsCount: true,
-    },
-  });
+    });
+    const byUser = new Map<string, { id: string; name: string | null; image: string | null; wins: number; createdAt: Date }>();
+    for (const debate of won) {
+      const user = debate.winningEntry?.user;
+      if (!user) continue;
+      const row = byUser.get(user.id) ?? { ...user, wins: 0 };
+      row.wins += 1;
+      byUser.set(user.id, row);
+    }
+    winners = [...byUser.values()].sort(
+      (x, y) => y.wins - x.wins || x.createdAt.getTime() - y.createdAt.getTime()
+    );
+  }
 
   // Get total votes received for each user's entries
-  const leaderboard = await Promise.all(
-    usersWithWins.map(async (user) => {
+  return Promise.all(
+    winners.map(async (user) => {
       const totalVotes = await prisma.vote.count({
         where: {
           entry: {
             userId: user.id,
+            ...(scope === "season" ? { debate: { season } } : {}),
           },
         },
       });
@@ -50,17 +70,46 @@ async function getLeaderboard(): Promise<LeaderboardUser[]> {
         id: user.id,
         name: user.name || "Anonymous",
         image: user.image,
-        wins: user.winsCount,
+        wins: user.wins,
         totalVotes,
       };
     })
   );
-
-  return leaderboard;
 }
 
-export default async function LeaderboardPage() {
-  const topWinners = await getLeaderboard();
+function ScopeTabs({ scope, season }: { scope: Scope; season: number }) {
+  const tab = (value: Scope, label: string) => (
+    <Link
+      href={value === "season" ? "/leaderboard" : "/leaderboard?scope=all"}
+      className={`px-4 py-2 rounded-full text-sm font-medium transition-colors ${
+        scope === value
+          ? "bg-purple-600 text-white"
+          : "bg-gray-100 text-gray-700 hover:bg-purple-100 hover:text-purple-700"
+      }`}
+    >
+      {label}
+    </Link>
+  );
+  return (
+    <div className="flex justify-center gap-2 mt-4">
+      {tab("season", `Season ${season}`)}
+      {tab("all", "All time")}
+    </div>
+  );
+}
+
+export default async function LeaderboardPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ scope?: string }>;
+}) {
+  const scope: Scope = (await searchParams).scope === "all" ? "all" : "season";
+  const latest = await prisma.debate.findFirst({
+    orderBy: { createdAt: "desc" },
+    select: { season: true },
+  });
+  const season = latest?.season ?? 1;
+  const topWinners = await getLeaderboard(scope, season);
 
   const getRankStyle = (rank: number) => {
     switch (rank) {
@@ -94,7 +143,10 @@ export default async function LeaderboardPage() {
       <div className="max-w-4xl mx-auto px-4 py-8">
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Leaderboard</h1>
-          <p className="text-gray-600">Top debaters of the month</p>
+          <p className="text-gray-600">
+            {scope === "season" ? "Top debaters this season" : "Top debaters of all time"}
+          </p>
+          <ScopeTabs scope={scope} season={season} />
         </div>
 
         <div className="text-center py-12 bg-gray-50 rounded-2xl border border-gray-200">
@@ -119,7 +171,10 @@ export default async function LeaderboardPage() {
     <div className="max-w-4xl mx-auto px-4 py-8">
       <div className="text-center mb-8">
         <h1 className="text-3xl font-bold text-gray-900 mb-2">Leaderboard</h1>
-        <p className="text-gray-600">Top debaters of the month</p>
+        <p className="text-gray-600">
+            {scope === "season" ? "Top debaters this season" : "Top debaters of all time"}
+          </p>
+          <ScopeTabs scope={scope} season={season} />
       </div>
 
       {/* Top 3 Podium */}

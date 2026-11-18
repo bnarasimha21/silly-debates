@@ -1,11 +1,13 @@
 import Link from "next/link";
 import { prisma } from "@/lib/prisma";
+import { debateLabel } from "@/lib/site";
 
 // Force dynamic rendering to always fetch fresh data
 export const dynamic = "force-dynamic";
 
 interface ClosedDebate {
   id: string;
+  season: number;
   dayNumber: number;
   topic: string;
   winner: string | null;
@@ -15,7 +17,7 @@ interface ClosedDebate {
 }
 
 /**
- * Fetch all closed debates ordered by dayNumber descending
+ * Fetch all closed debates newest first
  */
 async function getClosedDebates(): Promise<ClosedDebate[]> {
   const debates = await prisma.debate.findMany({
@@ -23,7 +25,7 @@ async function getClosedDebates(): Promise<ClosedDebate[]> {
       status: "CLOSED",
     },
     orderBy: {
-      dayNumber: "desc",
+      createdAt: "desc",
     },
     include: {
       winningEntry: {
@@ -56,6 +58,7 @@ async function getClosedDebates(): Promise<ClosedDebate[]> {
 
       return {
         id: debate.id,
+        season: debate.season,
         dayNumber: debate.dayNumber,
         topic: debate.topic,
         winner: debate.winningEntry?.content || null,
@@ -101,7 +104,7 @@ export default async function HistoryPage() {
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-2">
                     <span className="bg-purple-100 text-purple-700 text-xs font-medium px-2 py-1 rounded-full">
-                      Day {debate.dayNumber}
+                      {debateLabel(debate.season, debate.dayNumber)}
                     </span>
                     <span className="text-gray-400 text-sm">-</span>
                     <span className="text-gray-500 text-sm">

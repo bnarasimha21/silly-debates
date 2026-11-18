@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { generateDebateTopic } from "@/lib/ai";
-import { getPreviousTopics, getNextDayNumber } from "@/lib/knowledge-base";
+import { getPreviousTopics, getNextDebateSlot } from "@/lib/knowledge-base";
 
 // Secret key for cron job authentication
 const CRON_SECRET = process.env.CRON_SECRET;
@@ -51,16 +51,8 @@ export async function POST(request: NextRequest) {
     // Get previous topics to avoid duplicates
     const previousTopics = await getPreviousTopics();
 
-    // Get next day number
-    const nextDayNumber = await getNextDayNumber();
-
-    // Check if we've exceeded 30 days (optional limit)
-    if (nextDayNumber > 30) {
-      return NextResponse.json(
-        { error: "The 30-day debate challenge has ended!" },
-        { status: 400 }
-      );
-    }
+    // Next slot; rolls into a new season after the last day
+    const { season, dayNumber: nextDayNumber } = await getNextDebateSlot();
 
     // Generate a new topic using AI
     const topic = await generateDebateTopic(previousTopics);
@@ -69,6 +61,7 @@ export async function POST(request: NextRequest) {
     const debate = await prisma.debate.create({
       data: {
         topic,
+        season,
         dayNumber: nextDayNumber,
         status: "ACTIVE",
       },
@@ -79,6 +72,7 @@ export async function POST(request: NextRequest) {
       debate: {
         id: debate.id,
         topic: debate.topic,
+        season: debate.season,
         dayNumber: debate.dayNumber,
         createdAt: debate.createdAt,
       },
@@ -112,6 +106,7 @@ export async function GET() {
     });
 
     const totalDebates = await prisma.debate.count();
+    const nextSlot = await getNextDebateSlot();
 
     return NextResponse.json({
       hasActiveDebate: !!activeDebate,
@@ -125,7 +120,8 @@ export async function GET() {
           }
         : null,
       totalDebates,
-      nextDayNumber: totalDebates + 1,
+      nextSeason: nextSlot.season,
+      nextDayNumber: nextSlot.dayNumber,
     });
   } catch (error) {
     console.error("Error checking debate status:", error);

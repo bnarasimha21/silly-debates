@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { track } from "@/lib/track";
+import { getVisitorId } from "@/lib/visitor";
 
 /**
  * POST /api/votes
@@ -87,6 +89,14 @@ export async function POST(request: NextRequest) {
       include: {
         entry: true,
       },
+    });
+
+    await track("vote", {
+      visitorId: await getVisitorId(),
+      userId,
+      debateId,
+      entryId,
+      props: { switched: !!existingVoteInDebate },
     });
 
     // Use transaction to handle vote switching

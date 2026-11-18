@@ -36,9 +36,7 @@ async function getTodaysDebate(userId?: string): Promise<Debate | null> {
               }
             : false,
         },
-        orderBy: {
-          voteCount: "desc",
-        },
+        orderBy: [{ voteCount: "desc" }, { createdAt: "asc" }],
       },
     },
   });
@@ -70,6 +68,7 @@ async function getTodaysDebate(userId?: string): Promise<Debate | null> {
   return {
     id: debate.id,
     topic: debate.topic,
+    season: debate.season,
     dayNumber: debate.dayNumber,
     status: debate.status,
     createdAt: debate.createdAt.toISOString(),

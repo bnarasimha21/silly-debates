@@ -1,6 +1,8 @@
 import { signIn } from "@/lib/auth";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { track } from "@/lib/track";
+import { getVisitorId } from "@/lib/visitor";
 
 export default async function SignInPage() {
   const session = await auth();
@@ -25,6 +27,10 @@ export default async function SignInPage() {
           <form
             action={async () => {
               "use server";
+              await track("signin_start", {
+                visitorId: await getVisitorId(),
+                props: { provider: "google" },
+              });
               await signIn("google", { redirectTo: "/" });
             }}
           >
@@ -57,6 +63,10 @@ export default async function SignInPage() {
           <form
             action={async () => {
               "use server";
+              await track("signin_start", {
+                visitorId: await getVisitorId(),
+                props: { provider: "github" },
+              });
               await signIn("github", { redirectTo: "/" });
             }}
           >
